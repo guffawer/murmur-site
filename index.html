@@ -1147,18 +1147,20 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
 
   // src/feel.js
   var GAME = {
-    speed: 1.1,
-    turn: 1.2,
-    infW: 0.2,
+    speed: 1.2,
+    turn: 1.3,
+    infW: 0.1,
     infFrac: 0.2,
-    infFadeIn: 8,
-    infFadeSpan: 24,
-    infPull: 1.6,
+    infFadeIn: 15,
+    infFadeSpan: 40,
+    infPull: 1.25,
     showHold: 0.1,
     unmix: 0.25,
     burst: 3.2,
-    pull: 3,
-    joinR: 45
+    pull: 0.9,
+    regroup: 3,
+    joinR: 45,
+    roost: 1
   };
   var FEEL = typeof window !== "undefined" && window.__FEEL || GAME;
 
@@ -1349,8 +1351,8 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
     var P = window.__P || {};
     var ALIGN = P.align || 0.07, COH = (P.coh || 4e-3) * FEEL.pull, SEP = (P.sep || 0.55) * s, rs = (P.rs || 11) * s, EDGE = P.edge || 1.5, ROOST = P.roost || 16e-5, ZK = P.zk || 35e-4;
     var INF_W = P.inf || FEEL.infW;
-    var RG = (P.rg || 8) * s * Math.sqrt(Math.max(members, 30)), KG = (P.kg || 25e-4) * FEEL.pull, GCAP = (P.gcap || 0.2) * s * FEEL.pull;
-    var LONG = (P.long || 0.08) * s * FEEL.pull, NS = P.ns || 4, LR = (P.lr || 70) * s, BOOST = P.boost || 0.5;
+    var RG = (P.rg || 8) * s * Math.sqrt(Math.max(members, 30)), KG = (P.kg || 25e-4) * FEEL.regroup, GCAP = (P.gcap || 0.2) * s * FEEL.regroup;
+    var LONG = (P.long || 0.08) * s * FEEL.regroup, NS = P.ns || 4, LR = (P.lr || 70) * s, BOOST = P.boost || 0.5;
     var diving = falcon.state === "dive", warn = falcon.state === "warn";
     var detR = 0.2 * Math.min(W, H), detR2 = detR * detR, killR = 8 * s, killCap = 70;
     var shp = activeGate || dispGate && dispGate.mix > 0.05 ? (activeGate || dispGate).shape : null;
@@ -1489,7 +1491,7 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
         var infNow = (b.seed + (t * (P.rot || 0.5) | 0) * 7919) % 100 < (P.pct || 20);
         var minor = LAB[bi] >= 0 && LAB[bi] !== mainId && !shp;
         if (minor) {
-          var jx = mainCx - b.x, jy = mainCy - b.y, jd = Math.hypot(jx, jy) || 1, KJ = (P.kj || 0.18) * s * FEEL.pull * holdK;
+          var jx = mainCx - b.x, jy = mainCy - b.y, jd = Math.hypot(jx, jy) || 1, KJ = (P.kj || 0.18) * s * FEEL.regroup * holdK;
           ax += jx / jd * KJ;
           ay += jy / jd * KJ;
         }
@@ -1563,6 +1565,7 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
       JOIN[bi] = join;
     }
     var spdSum = 0, spdN = 0, inside = 0;
+    var roosting = FEEL.roost && S.phase === "roost", rk = roosting ? Math.min(1, S.roostT / 1.2) : 0;
     for (var bj = 0; bj < birds.length; bj++) {
       var B = birds[bj];
       if (!B.alive) continue;
@@ -1576,6 +1579,19 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
         if (cc) cc.joined++;
         B.c = -1;
         stats2.joined++;
+      }
+      if (roosting && B.m) {
+        var rpx = W * 0.5 + (B.seed % 997 / 997 - 0.5) * W * 0.62, rpy = H * 0.68 + (B.seed >> 4) % 89 / 89 * H * 0.075;
+        var rdx = Math.max(-vmax, Math.min(vmax, (rpx - B.x) * 0.035)), rdy = Math.max(-vmax, Math.min(vmax, (rpy - B.y) * 0.035));
+        B.vx += (rdx - B.vx) * 0.07 * rk * f;
+        B.vy += (rdy - B.vy) * 0.07 * rk * f;
+        B.vz += (-B.z * 0.02 - B.vz) * 0.07 * rk * f;
+        B.x += B.vx * f;
+        B.y += B.vy * f;
+        B.z += B.vz * f;
+        spdSum += Math.hypot(B.vx, B.vy);
+        spdN++;
+        continue;
       }
       B.vx += AX[bj] * f;
       B.vy += AY[bj] * f;
@@ -2526,7 +2542,7 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
       }
     } else if (S.phase === "roost") {
       S.roostT += dt;
-      if (S.roostT > 4.5) finish(true);
+      if (S.roostT > (FEEL.roost ? 6 : 4.5)) finish(true);
     }
   }
   var startEl2 = document.getElementById("start");
@@ -2595,5 +2611,5 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
   } };
 })();
 </script>
-<div style="position:fixed;left:0;right:0;top:calc(env(safe-area-inset-top,0px) + 2px);z-index:99999;text-align:center;font:600 12px/1 monospace;color:#fff;opacity:.8;text-shadow:0 0 3px #000;pointer-events:none">Murmur web build 3 - fa1e8fa - 2026-11-03</div></body>
+<div style="position:fixed;left:0;right:0;top:calc(env(safe-area-inset-top,0px) + 2px);z-index:99999;text-align:center;font:600 12px/1 monospace;color:#fff;opacity:.8;text-shadow:0 0 3px #000;pointer-events:none">Murmur web build 4 - d4f5d16 - 2026-11-03</div></body>
 </html>

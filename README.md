@@ -2,6 +2,6 @@
 
 Open the page in Safari on iPhone; Share, then Add to Home Screen for full screen.
 
-**Current: build 3** (fa1e8fa, 2026-11-03). The same label shows at the top of the game.
+**Current: build 4** (d4f5d16, 2026-11-03). The same label shows at the top of the game.
 
-What changed: calmer speed and spacing, soft wind sound, shape glows when done and clears in 2 s, new birds can join
+What changed: one teardrop while leading (no blobs), v6 spacing, birds settle on the trees at the end
