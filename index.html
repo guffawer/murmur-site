@@ -49,8 +49,16 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
 .stats dt { color: var(--muted); }
 .stats dd { margin: 0; font-variant-numeric: tabular-nums; font-weight: 600; }
 .ghost { font-weight: 600; font-size: 0.82rem; color: var(--text); background: transparent; border: 1px solid rgba(246,234,216,0.32); padding: 10px 12px; }
-.pick { display: flex; gap: 10px; align-items: center; justify-content: center; font-size: 0.82rem; color: var(--muted); }
-.pick select { font: 600 0.9rem var(--font-ui); color: var(--text); background: rgba(20,15,28,0.6); border: 1px solid rgba(246,234,216,0.32); border-radius: 6px; padding: 9px 10px; max-width: 230px; }
+.starrow { display: flex; justify-content: center; gap: 8px; min-height: 34px; }
+.starrow svg { width: 34px; height: 34px; }
+.maplist { display: grid; gap: 6px; max-height: 56vh; overflow-y: auto; text-align: left; }
+.mapnode { display: grid; grid-template-columns: 34px 1fr auto; gap: 10px; align-items: center; width: 100%; padding: 10px 12px; color: var(--text); background: rgba(20,15,28,0.6); border: 1px solid rgba(246,234,216,0.2); border-radius: 6px; font: 400 0.95rem var(--font-ui); text-align: left; }
+.mapnode b { font-weight: 600; color: var(--glow); font-variant-numeric: tabular-nums; }
+.mapnode small { display: block; color: var(--muted); font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase; }
+.mapnode.locked { opacity: 0.45; }
+.mapnode svg { width: 15px; height: 15px; }
+.stars3 { display: flex; gap: 2px; }
+.chaptercard { padding: 12px; border: 1px dashed rgba(246,234,216,0.3); border-radius: 6px; color: var(--muted); font-size: 0.85rem; line-height: 1.4; }
 .tools { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
 .card.wide { max-width: 380px; }
 .sub { font-family: var(--font-display); font-style: italic; font-weight: 600; font-size: 1.9rem; line-height: 1; color: var(--glow); margin: 0; }
@@ -79,12 +87,11 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
       <li><b>Gather</b><span>Fly through stragglers to grow the flock</span></li>
     </ul>
     <button id="go" type="button">Begin flight</button>
-    <label class="pick">Level <select id="levelPick"></select></label>
     <div class="tools">
       <button id="benchGo" type="button" class="ghost">Benchmark (60 s)</button>
       <button id="readoutBtn" type="button" class="ghost" aria-pressed="false">Frame readout: off</button>
     </div>
-    <p class="note">Chapter 1 is being built level by level: pick one above. Sound on. Haptics work in Android browsers; on iPhone they arrive with the native build.</p>
+    <p class="note">Chapter 1: Baltic coast, ten levels. Sound on. Haptics work in Android browsers; on iPhone they arrive with the native build.</p>
   </div>
 </div>
 
@@ -100,7 +107,38 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
       <div><dt>Shapes formed</dt><dd id="sGates">0 of 2</dd></div>
       <div><dt>Best</dt><dd id="sBest">0</dd></div>
     </dl>
-    <button id="again" type="button">Fly again</button>
+    <div class="starrow" id="endStars" aria-label="Stars"></div>
+    <p class="note" id="endShare"></p>
+    <button id="endNext" type="button" hidden>Next level</button>
+    <div class="tools">
+      <button id="again" type="button" class="ghost">Retry</button>
+      <button id="endMap" type="button" class="ghost">Map</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="map" hidden>
+  <div class="card wide">
+    <p class="note" id="mapChapter">Chapter 1</p>
+    <h2 class="sub" id="mapTitle">Baltic coast</h2>
+    <p class="note" id="mapTotal">0 of 30 stars</p>
+    <div class="maplist" id="mapList"></div>
+    <div class="tools">
+      <button id="mapBack" type="button" class="ghost">Back</button>
+      <button id="mapOpenAll" type="button" class="ghost" aria-pressed="false">Test: open all levels</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="intro" hidden>
+  <div class="card">
+    <p class="note" id="introKind"></p>
+    <h2 class="sub" id="introName"></h2>
+    <div class="starrow" id="introStars" aria-label="Best stars"></div>
+    <p class="lede" id="introHint"></p>
+    <p class="note" id="introGoal"></p>
+    <button id="fly" type="button">Fly</button>
+    <button id="introBack" type="button" class="ghost">Map</button>
   </div>
 </div>
 <div class="overlay" id="benchEnd" hidden>
@@ -1263,14 +1301,14 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
     pts.sort(function(a, b) {
       return a.y - b.y;
     });
-    var pick2 = [];
-    for (var i = 0; i < pts.length && pick2.length < 8; i++) {
+    var pick = [];
+    for (var i = 0; i < pts.length && pick.length < 8; i++) {
       var ok = true;
-      for (var j = 0; j < pick2.length; j++) if (Math.abs(pick2[j].x - pts[i].x) < 45 * s) ok = false;
-      if (ok) pick2.push(pts[i]);
+      for (var j = 0; j < pick.length; j++) if (Math.abs(pick[j].x - pts[i].x) < 45 * s) ok = false;
+      if (ok) pick.push(pts[i]);
     }
-    if (!pick2.length) pick2.push({ x: W * 0.5, y: H * 0.8 });
-    S.perch = pick2;
+    if (!pick.length) pick.push({ x: W * 0.5, y: H * 0.8 });
+    S.perch = pick;
   }
   var CS = 24;
   var gcols = 0;
@@ -1971,6 +2009,127 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
     return null;
   }
   var V6 = getLevel("v6");
+  function chapterOf(level) {
+    for (var i = 0; i < CHAPTERS.length; i++) if (CHAPTERS[i].chapter === level.chapter) return CHAPTERS[i];
+    return null;
+  }
+  function nextLevel(level) {
+    var i = LADDER.indexOf(level);
+    return i >= 0 && i + 1 < LADDER.length && LADDER[i + 1].chapter === level.chapter ? LADDER[i + 1] : null;
+  }
+
+  // src/progress.js
+  var KEY = "murmur-progress-v1";
+  function emptyProgress() {
+    return { v: 1, best: {}, allOpen: false };
+  }
+  function shareOf(home, offered) {
+    if (!(offered > 0) || !(home > 0)) return 0;
+    return Math.min(100, home / offered * 100);
+  }
+  function starsFor(share, thresholds) {
+    var n = 0;
+    for (var i = 0; i < thresholds.length; i++) if (share >= thresholds[i]) n++;
+    return n;
+  }
+  function clean(p) {
+    var out = emptyProgress();
+    if (!p || typeof p !== "object" || p.v !== 1 || !p.best || typeof p.best !== "object") return out;
+    for (var id in p.best) {
+      var b = p.best[id];
+      if (b && typeof b === "object" && b.stars >= 0 && b.stars <= 3 && b.stars === Math.floor(b.stars) && isFinite(b.share) && isFinite(b.home))
+        out.best[id] = { stars: b.stars, share: b.share, home: b.home };
+    }
+    out.allOpen = p.allOpen === true;
+    return out;
+  }
+  function loadProgress(storage) {
+    try {
+      var s = storage || localStorage, raw = s.getItem(KEY);
+      return raw ? clean(JSON.parse(raw)) : emptyProgress();
+    } catch (e) {
+      return emptyProgress();
+    }
+  }
+  function saveProgress(p, storage) {
+    try {
+      (storage || localStorage).setItem(KEY, JSON.stringify(p));
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+  function record(p, level, home, offered) {
+    var share = shareOf(home, offered), stars2 = starsFor(share, level.stars), old = p.best[level.id];
+    var improved = !old || stars2 > old.stars || stars2 === old.stars && share > old.share;
+    if (improved) p.best[level.id] = { stars: stars2, share, home };
+    return { stars: stars2, share, bestStars: p.best[level.id].stars, improved };
+  }
+  function starsOf(p, id) {
+    return p.best[id] ? p.best[id].stars : 0;
+  }
+  function totalStars(p, ids) {
+    var n = 0;
+    for (var i = 0; i < ids.length; i++) n += starsOf(p, ids[i]);
+    return n;
+  }
+  function isOpen(p, ids, i) {
+    return p.allOpen || i === 0 || starsOf(p, ids[i - 1]) >= 1;
+  }
+  function chapterOpen(p, ids, need) {
+    return p.allOpen || totalStars(p, ids) >= need;
+  }
+
+  // src/native.js
+  init_dist();
+
+  // ../murmur/node_modules/@capacitor/app/dist/esm/index.js
+  init_dist();
+  var App = registerPlugin("App", {
+    web: () => Promise.resolve().then(() => (init_web(), web_exports)).then((m) => new m.AppWeb())
+  });
+
+  // ../murmur/node_modules/@capacitor/splash-screen/dist/esm/index.js
+  init_dist();
+  var SplashScreen = registerPlugin("SplashScreen", {
+    web: () => Promise.resolve().then(() => (init_web2(), web_exports2)).then((m) => new m.SplashScreenWeb())
+  });
+
+  // src/native.js
+  var isNative = !!(Capacitor && typeof Capacitor.isNativePlatform === "function" && Capacitor.isNativePlatform());
+  var backHandlers = [];
+  function setBackHandler(fn) {
+    backHandlers.push(fn);
+  }
+  function backPressed() {
+    for (var i = backHandlers.length - 1; i >= 0; i--) if (backHandlers[i]()) return true;
+    return false;
+  }
+  function quiet(p) {
+    if (p && typeof p.catch === "function") p.catch(function() {
+    });
+    return p;
+  }
+  function appVersion() {
+    if (!isNative) return Promise.resolve(null);
+    return App.getInfo().then(function(i) {
+      return i.version + " (" + i.build + ")";
+    }, function() {
+      return null;
+    });
+  }
+  if (isNative) {
+    quiet(App.addListener("backButton", function() {
+      if (!backPressed()) quiet(App.minimizeApp());
+    }));
+    quiet(App.addListener("pause", suspendAudio));
+    quiet(App.addListener("resume", resumeAudio));
+    window.addEventListener("load", function() {
+      setTimeout(function() {
+        quiet(SplashScreen.hide({ fadeOutDuration: 250 }));
+      }, 150);
+    });
+  }
 
   // src/render.js
   var stars = [];
@@ -2216,6 +2375,11 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
     ctx.fillStyle = rgba(GLOW, 0.75);
     ctx.font = "400 " + Math.round(11 * s) + "px Outfit, Arial, sans-serif";
     ctx.fillText(phase === "roost" ? "Roost" : "to the roost", bx + bw, by + 16 * s);
+    if (!S.level.test) {
+      ctx.textAlign = "left";
+      ctx.fillStyle = rgba(GLOW, 0.65);
+      ctx.fillText(S.level.id + "  " + S.level.name, left, top + 42 * s);
+    }
     if (phase === "play" && down) {
       ctx.strokeStyle = rgba(GLOW, 0.35);
       ctx.lineWidth = 1.2 * s;
@@ -2239,53 +2403,6 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
       ctx.font = "600 " + Math.round(12 * s) + "px Outfit, Arial, sans-serif";
       ctx.fillText(falcon.state === "warn" ? "Falcon. Tap to split" : "Tap to split", rx, ry - 22 * s);
     }
-  }
-
-  // src/native.js
-  init_dist();
-
-  // ../murmur/node_modules/@capacitor/app/dist/esm/index.js
-  init_dist();
-  var App = registerPlugin("App", {
-    web: () => Promise.resolve().then(() => (init_web(), web_exports)).then((m) => new m.AppWeb())
-  });
-
-  // ../murmur/node_modules/@capacitor/splash-screen/dist/esm/index.js
-  init_dist();
-  var SplashScreen = registerPlugin("SplashScreen", {
-    web: () => Promise.resolve().then(() => (init_web2(), web_exports2)).then((m) => new m.SplashScreenWeb())
-  });
-
-  // src/native.js
-  var isNative = !!(Capacitor && typeof Capacitor.isNativePlatform === "function" && Capacitor.isNativePlatform());
-  var backHandler = null;
-  function setBackHandler(fn) {
-    backHandler = fn;
-  }
-  function quiet(p) {
-    if (p && typeof p.catch === "function") p.catch(function() {
-    });
-    return p;
-  }
-  function appVersion() {
-    if (!isNative) return Promise.resolve(null);
-    return App.getInfo().then(function(i) {
-      return i.version + " (" + i.build + ")";
-    }, function() {
-      return null;
-    });
-  }
-  if (isNative) {
-    quiet(App.addListener("backButton", function() {
-      if (!(backHandler && backHandler())) quiet(App.minimizeApp());
-    }));
-    quiet(App.addListener("pause", suspendAudio));
-    quiet(App.addListener("resume", resumeAudio));
-    window.addEventListener("load", function() {
-      setTimeout(function() {
-        quiet(SplashScreen.hide({ fadeOutDuration: 250 }));
-      }, 150);
-    });
   }
 
   // src/bench.js
@@ -2682,15 +2799,68 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
     var m = /[?&]level=([\w.-]+)/.exec(window.location && window.location.search || "");
     return m ? getLevel(m[1]) : null;
   }
-  var current = wantedLevel() || LADDER[0] || V6;
-  var pick = document.getElementById("levelPick");
-  pick.innerHTML = LEVELS.map(function(l) {
-    return '<option value="' + l.id + '">' + (l.test ? "Test: " : l.id + "  ") + l.name + "</option>";
-  }).join("");
-  pick.value = current.id;
-  pick.addEventListener("change", function() {
-    current = getLevel(pick.value) || current;
-  });
+  var forced = wantedLevel();
+  var current = forced || LADDER[0] || V6;
+  var progress = loadProgress();
+  var mapEl = document.getElementById("map");
+  var introEl = document.getElementById("intro");
+  var CH = LADDER.length ? chapterOf(LADDER[0]) : null;
+  function chapterIds(ch) {
+    return LADDER.filter(function(l) {
+      return l.chapter === ch;
+    }).map(function(l) {
+      return l.id;
+    });
+  }
+  var TYPE_NAME = { journey: "Journey", display: "Display", gauntlet: "Gauntlet", gather: "Gather", "grand-roost": "Grand roost" };
+  function starSvg(on) {
+    return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l2.9 6.2 6.6.8-4.9 4.6 1.3 6.7L12 17.5l-5.9 3.3 1.3-6.7L2.5 9.5l6.6-.8z" fill="' + (on ? "#ffd7a0" : "none") + '" stroke="#ffd7a0" stroke-opacity="' + (on ? "1" : "0.45") + '" stroke-width="1.4" stroke-linejoin="round"/></svg>';
+  }
+  function starsHtml(n) {
+    return starSvg(n >= 1) + starSvg(n >= 2) + starSvg(n >= 3);
+  }
+  function goalText(l) {
+    return "Bring " + l.stars[0] + " of every 100 birds on offer home for one star, " + l.stars[1] + " for two, " + l.stars[2] + " for three.";
+  }
+  function showMap() {
+    var ids = chapterIds(CH.chapter), total = totalStars(progress, ids), html = "";
+    document.getElementById("mapChapter").textContent = "Chapter " + CH.chapter;
+    document.getElementById("mapTitle").textContent = CH.name;
+    document.getElementById("mapTotal").textContent = total + " of " + ids.length * 3 + " stars";
+    LADDER.forEach(function(l) {
+      if (l.chapter !== CH.chapter) return;
+      var open = isOpen(progress, ids, ids.indexOf(l.id));
+      html += '<button type="button" class="mapnode' + (open ? "" : " locked") + '" data-level="' + l.id + '"' + (open ? "" : ' data-locked="1"') + "><b>" + l.id + "</b><span>" + l.name + "<small>" + (TYPE_NAME[l.type] || l.type) + '</small></span><span class="stars3">' + (open ? starsHtml(starsOf(progress, l.id)) : "locked") + "</span></button>";
+    });
+    if (CH.next) {
+      var ok = chapterOpen(progress, ids, CH.next.starsNeeded);
+      html += '<div class="chaptercard">' + CH.next.name + (ok ? ": unlocked. It arrives in a later build." : ": opens at " + CH.next.starsNeeded + " of " + ids.length * 3 + " stars. You have " + total + ".") + "</div>";
+    }
+    document.getElementById("mapList").innerHTML = html;
+    var oa = document.getElementById("mapOpenAll");
+    oa.textContent = progress.allOpen ? "Test: all levels open" : "Test: open all levels";
+    oa.setAttribute("aria-pressed", String(progress.allOpen));
+    startEl2.hidden = true;
+    introEl.hidden = true;
+    endEl2.hidden = true;
+    mapEl.hidden = false;
+  }
+  function showIntro(l) {
+    current = l;
+    document.getElementById("introKind").textContent = "Level " + l.id + "  \xB7  " + (TYPE_NAME[l.type] || l.type) + "  \xB7  " + l.length + " s";
+    document.getElementById("introName").textContent = l.name;
+    document.getElementById("introStars").innerHTML = starsHtml(starsOf(progress, l.id));
+    document.getElementById("introHint").textContent = l.hint;
+    document.getElementById("introGoal").textContent = goalText(l);
+    mapEl.hidden = true;
+    introEl.hidden = false;
+  }
+  function showStart() {
+    mapEl.hidden = true;
+    introEl.hidden = true;
+    endEl2.hidden = true;
+    startEl2.hidden = false;
+  }
   function begin() {
     ensureAudio();
     setLevel(current);
@@ -2699,6 +2869,8 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
     S.phase = "play";
     startEl2.hidden = true;
     endEl2.hidden = true;
+    mapEl.hidden = true;
+    introEl.hidden = true;
   }
   function finish(home) {
     S.phase = "end";
@@ -2715,10 +2887,66 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
     document.getElementById("sLost").textContent = "\u2212" + S.stats.lost;
     document.getElementById("sGates").textContent = S.stats.gates + " of " + S.gates.length;
     document.getElementById("sBest").textContent = String(b);
+    var l = S.level, scored = !l.test, nextBtn = document.getElementById("endNext");
+    document.getElementById("endStars").innerHTML = "";
+    document.getElementById("endShare").textContent = "";
+    nextBtn.hidden = true;
+    if (scored) {
+      var r = record(progress, l, n, S.offered);
+      saveProgress(progress);
+      document.getElementById("endStars").innerHTML = starsHtml(r.stars);
+      document.getElementById("endShare").textContent = Math.round(r.share) + " percent of the " + S.offered + " birds on offer came home" + (r.stars < 3 ? ". Next star at " + l.stars[r.stars] + " percent." : ".");
+      var nx = nextLevel(l), ids = chapterIds(l.chapter);
+      if (nx && isOpen(progress, ids, ids.indexOf(nx.id))) {
+        nextBtn.hidden = false;
+        nextBtn.dataset.level = nx.id;
+      }
+    }
+    mapEl.hidden = true;
+    introEl.hidden = true;
     endEl2.hidden = false;
   }
-  document.getElementById("go").addEventListener("click", begin);
+  document.getElementById("go").addEventListener("click", function() {
+    if (forced) begin();
+    else showMap();
+  });
   document.getElementById("again").addEventListener("click", begin);
+  document.getElementById("fly").addEventListener("click", begin);
+  document.getElementById("endNext").addEventListener("click", function() {
+    var nx = getLevel(document.getElementById("endNext").dataset.level);
+    if (nx) showIntro(nx);
+  });
+  document.getElementById("endMap").addEventListener("click", function() {
+    if (S.level && !S.level.test) showMap();
+    else showStart();
+  });
+  document.getElementById("introBack").addEventListener("click", showMap);
+  document.getElementById("mapBack").addEventListener("click", showStart);
+  document.getElementById("mapOpenAll").addEventListener("click", function() {
+    progress.allOpen = !progress.allOpen;
+    saveProgress(progress);
+    showMap();
+  });
+  document.getElementById("mapList").addEventListener("click", function(e) {
+    var node = e && e.target && e.target.closest ? e.target.closest("[data-level]") : null;
+    var l = node ? getLevel(node.dataset.level) : null, ids = l ? chapterIds(l.chapter) : [];
+    if (l && isOpen(progress, ids, ids.indexOf(l.id))) showIntro(l);
+  });
+  setBackHandler(function() {
+    if (!introEl.hidden) {
+      showMap();
+      return true;
+    }
+    if (!mapEl.hidden) {
+      showStart();
+      return true;
+    }
+    if (!endEl2.hidden && S.level && !S.level.test) {
+      showMap();
+      return true;
+    }
+    return false;
+  });
   setLevel(current);
   reset(480);
   var last = performance.now();
@@ -2741,8 +2969,10 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
     return S.stats;
   }, bench: function() {
     return bench.last;
+  }, progress: function() {
+    return progress;
   } };
 })();
 </script>
-<div style="position:fixed;left:0;right:0;top:calc(env(safe-area-inset-top,0px) + 2px);z-index:99999;text-align:center;font:600 12px/1 monospace;color:#fff;opacity:.8;text-shadow:0 0 3px #000;pointer-events:none">Murmur web build 7 - 938c6e0 - 2026-11-03</div></body>
+<div style="position:fixed;left:0;right:0;top:calc(env(safe-area-inset-top,0px) + 2px);z-index:99999;text-align:center;font:600 12px/1 monospace;color:#fff;opacity:.8;text-shadow:0 0 3px #000;pointer-events:none">Murmur web build 8 - 2be49ee - 2026-11-03</div></body>
 </html>
