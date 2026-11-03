@@ -821,7 +821,7 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
   }
 
   // src/shapenames.js
-  var SHAPE_NAMES = ["heart", "fish"];
+  var SHAPE_NAMES = ["heart", "fish", "ship"];
 
   // src/shapes.js
   function makeShape(build) {
@@ -864,7 +864,29 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
     p.lineTo(0.47, 0.21);
     p.closePath();
   });
-  var SHAPES = { heart: HEART, fish: FISH };
+  var SHIP = makeShape(function(p) {
+    p.moveTo(-0.46, 0.13);
+    p.lineTo(0.46, 0.13);
+    p.quadraticCurveTo(0.4, 0.36, 0.18, 0.37);
+    p.lineTo(-0.22, 0.37);
+    p.quadraticCurveTo(-0.4, 0.33, -0.46, 0.13);
+    p.closePath();
+    p.rect(-0.022, -0.43, 0.044, 0.56);
+    p.moveTo(-0.022, -0.37);
+    p.lineTo(-0.022, 0.07);
+    p.lineTo(-0.4, 0.07);
+    p.quadraticCurveTo(-0.27, -0.18, -0.022, -0.37);
+    p.closePath();
+    p.moveTo(0.022, -0.32);
+    p.quadraticCurveTo(0.24, -0.14, 0.4, 0.07);
+    p.lineTo(0.022, 0.07);
+    p.closePath();
+    p.moveTo(0.022, -0.43);
+    p.lineTo(0.15, -0.395);
+    p.lineTo(0.022, -0.36);
+    p.closePath();
+  });
+  var SHAPES = { heart: HEART, fish: FISH, ship: SHIP };
   SHAPE_NAMES.forEach(function(n) {
     if (!SHAPES[n]) throw new Error("shape missing: " + n);
   });
@@ -1936,7 +1958,7 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
   }
 
   // levels:levels
-  var levels_default = { chapters: [{ chapter: 1, name: "Baltic coast", sky: { day: { top: "#2c2b5e", mid: "#b05d6c", hor: "#ffbb78" }, dusk: { top: "#1b1d45", mid: "#50305d", hor: "#e9784c" } }, stars: [50, 70, 85], next: { name: "English wetlands", starsNeeded: 15 } }], levels: [{ id: "v6", chapter: 0, order: 0, test: true, name: "Prototype v6", type: "journey", length: 90, hint: "The signed-off prototype level. Used by the tests and the benchmark; not part of the game ladder.", flock: { start: 560 }, stragglers: { first: 6, gap: { min: 7, span: 3 }, size: { min: 14, span: 10 }, y: { min: 0.14, span: 0.42 }, stop: 8 }, threats: [{ kind: "peregrine", times: [12, 22, 45, 53, 66, 79], warn: 1.6, killRadius: 8, killCap: 70 }], shapes: [{ shape: "heart", at: 27, dur: 16 }, { shape: "fish", at: 57, dur: 16 }], roost: { settle: 6 }, sky: { day: { top: "#2c2b5e", mid: "#b05d6c", hor: "#ffbb78" }, dusk: { top: "#1b1d45", mid: "#50305d", hor: "#e9784c" } }, stars: [50, 70, 85] }, { id: "1.1", chapter: 1, order: 1, name: "Dune Run", type: "journey", length: 90, hint: "Drag to lead the flock along the coast to the roost. Nothing hunts here yet.", flock: { start: 560 }, threats: [], shapes: [], roost: { settle: 6 }, sky: { day: { top: "#2c2b5e", mid: "#b05d6c", hor: "#ffbb78" }, dusk: { top: "#1b1d45", mid: "#50305d", hor: "#e9784c" } }, stars: [50, 70, 85] }, { id: "1.2", chapter: 1, order: 2, name: "Amber Shore", type: "gather", length: 75, hint: "Small groups drift in from the right. Fly through them to bring them into the flock.", flock: { start: 400 }, stragglers: { first: 5, gap: { min: 5, span: 2 }, size: { min: 18, span: 10 }, y: { min: 0.14, span: 0.42 }, stop: 8 }, threats: [], shapes: [], roost: { settle: 6 }, sky: { day: { top: "#2c2b5e", mid: "#b05d6c", hor: "#ffbb78" }, dusk: { top: "#1b1d45", mid: "#50305d", hor: "#e9784c" } }, stars: [50, 70, 85] }] };
+  var levels_default = { chapters: [{ chapter: 1, name: "Baltic coast", sky: { day: { top: "#2c2b5e", mid: "#b05d6c", hor: "#ffbb78" }, dusk: { top: "#1b1d45", mid: "#50305d", hor: "#e9784c" } }, stars: [50, 70, 85], next: { name: "English wetlands", starsNeeded: 15 } }], levels: [{ id: "v6", chapter: 0, order: 0, test: true, name: "Prototype v6", type: "journey", length: 90, hint: "The signed-off prototype level. Used by the tests and the benchmark; not part of the game ladder.", flock: { start: 560 }, stragglers: { first: 6, gap: { min: 7, span: 3 }, size: { min: 14, span: 10 }, y: { min: 0.14, span: 0.42 }, stop: 8 }, threats: [{ kind: "peregrine", times: [12, 22, 45, 53, 66, 79], warn: 1.6, killRadius: 8, killCap: 70 }], shapes: [{ shape: "heart", at: 27, dur: 16 }, { shape: "fish", at: 57, dur: 16 }], roost: { settle: 6 }, sky: { day: { top: "#2c2b5e", mid: "#b05d6c", hor: "#ffbb78" }, dusk: { top: "#1b1d45", mid: "#50305d", hor: "#e9784c" } }, stars: [50, 70, 85] }, { id: "1.1", chapter: 1, order: 1, name: "Dune Run", type: "journey", length: 90, hint: "Drag to lead the flock along the coast to the roost. Nothing hunts here yet.", flock: { start: 560 }, threats: [], shapes: [], roost: { settle: 6 }, sky: { day: { top: "#2c2b5e", mid: "#b05d6c", hor: "#ffbb78" }, dusk: { top: "#1b1d45", mid: "#50305d", hor: "#e9784c" } }, stars: [50, 70, 85] }, { id: "1.2", chapter: 1, order: 2, name: "Amber Shore", type: "gather", length: 75, hint: "Small groups drift in from the right. Fly through them to bring them into the flock.", flock: { start: 400 }, stragglers: { first: 5, gap: { min: 5, span: 2 }, size: { min: 18, span: 10 }, y: { min: 0.14, span: 0.42 }, stop: 8 }, threats: [], shapes: [], roost: { settle: 6 }, sky: { day: { top: "#2c2b5e", mid: "#b05d6c", hor: "#ffbb78" }, dusk: { top: "#1b1d45", mid: "#50305d", hor: "#e9784c" } }, stars: [50, 70, 85] }, { id: "1.3", chapter: 1, order: 3, name: "Heart of the Bay", type: "display", length: 60, hint: "A glowing outline appears. Hold the flock inside it until the shape forms.", flock: { start: 560 }, threats: [], shapes: [{ shape: "heart", at: 12, dur: 24 }], roost: { settle: 6 }, sky: { day: { top: "#2c2b5e", mid: "#b05d6c", hor: "#ffbb78" }, dusk: { top: "#1b1d45", mid: "#50305d", hor: "#e9784c" } }, stars: [50, 70, 85] }, { id: "1.4", chapter: 1, order: 4, name: "The Peregrine", type: "gauntlet", length: 75, hint: "A peregrine falcon hunts the flock. When it lines up to stoop, tap to split the flock apart.", introduces: ["peregrine"], flock: { start: 560 }, threats: [{ kind: "peregrine", times: [16, 46], warn: 1.6, killRadius: 6, killCap: 40 }], shapes: [], roost: { settle: 6 }, sky: { day: { top: "#2c2b5e", mid: "#b05d6c", hor: "#ffbb78" }, dusk: { top: "#1b1d45", mid: "#50305d", hor: "#e9784c" } }, stars: [50, 70, 85] }, { id: "1.5", chapter: 1, order: 5, name: "Pine Ridge", type: "journey", length: 90, hint: "Gather the groups that drift in, and split the flock when the falcon stoops.", flock: { start: 520 }, stragglers: { first: 6, gap: { min: 7, span: 3 }, size: { min: 14, span: 10 }, y: { min: 0.14, span: 0.42 }, stop: 8 }, threats: [{ kind: "peregrine", times: [24, 58], warn: 1.6, killRadius: 6, killCap: 40 }], shapes: [], roost: { settle: 6 }, sky: { day: { top: "#2c2b5e", mid: "#b05d6c", hor: "#ffbb78" }, dusk: { top: "#1b1d45", mid: "#50305d", hor: "#e9784c" } }, stars: [50, 70, 85] }, { id: "1.6", chapter: 1, order: 6, name: "Sails at Dusk", type: "display", length: 60, hint: "Two shapes this time: a heart, then a sailing ship. Hold the flock inside each outline.", flock: { start: 560 }, threats: [], shapes: [{ shape: "heart", at: 8, dur: 18 }, { shape: "ship", at: 34, dur: 20 }], roost: { settle: 6 }, sky: { day: { top: "#2c2b5e", mid: "#b05d6c", hor: "#ffbb78" }, dusk: { top: "#1b1d45", mid: "#50305d", hor: "#e9784c" } }, stars: [50, 70, 85] }, { id: "1.7", chapter: 1, order: 7, name: "Lost Flocks", type: "gather", length: 75, hint: "Larger groups this time, and a falcon about. Gather them without losing the flock.", flock: { start: 440 }, stragglers: { first: 5, gap: { min: 8, span: 3 }, size: { min: 20, span: 10 }, y: { min: 0.14, span: 0.42 }, stop: 10 }, threats: [{ kind: "peregrine", times: [28, 56], warn: 1.6, killRadius: 6, killCap: 40 }], shapes: [], roost: { settle: 6 }, sky: { day: { top: "#2c2b5e", mid: "#b05d6c", hor: "#ffbb78" }, dusk: { top: "#1b1d45", mid: "#50305d", hor: "#e9784c" } }, stars: [50, 70, 85] }, { id: "1.8", chapter: 1, order: 8, name: "Falcon Cliffs", type: "gauntlet", length: 75, hint: "Three dives, and the warning is shorter. Tap as the falcon lines up.", flock: { start: 560 }, threats: [{ kind: "peregrine", times: [14, 34, 54], warn: 1.3, killRadius: 7, killCap: 40 }], shapes: [], roost: { settle: 6 }, sky: { day: { top: "#2c2b5e", mid: "#b05d6c", hor: "#ffbb78" }, dusk: { top: "#1b1d45", mid: "#50305d", hor: "#e9784c" } }, stars: [50, 70, 85] }, { id: "1.9", chapter: 1, order: 9, name: "The Long Coast", type: "journey", length: 90, hint: "Everything together: groups to gather, a heart to form, and two dives to survive.", flock: { start: 480 }, stragglers: { first: 6, gap: { min: 7, span: 3 }, size: { min: 14, span: 10 }, y: { min: 0.14, span: 0.42 }, stop: 8 }, threats: [{ kind: "peregrine", times: [20, 68], warn: 1.6, killRadius: 6, killCap: 40 }], shapes: [{ shape: "heart", at: 38, dur: 18 }], roost: { settle: 6 }, sky: { day: { top: "#2c2b5e", mid: "#b05d6c", hor: "#ffbb78" }, dusk: { top: "#1b1d45", mid: "#50305d", hor: "#e9784c" } }, stars: [50, 70, 85] }, { id: "1.10", chapter: 1, order: 10, name: "Baltic Roost", type: "grand-roost", length: 120, hint: "The chapter finale: a long flight, three dives, then a large sailing ship to form before the roost.", flock: { start: 480 }, stragglers: { first: 6, gap: { min: 8, span: 4 }, size: { min: 14, span: 10 }, y: { min: 0.14, span: 0.42 }, stop: 26 }, threats: [{ kind: "peregrine", times: [22, 52, 82], warn: 1.6, killRadius: 6, killCap: 40 }], shapes: [{ shape: "ship", at: 96, dur: 22, scale: 1.2 }], roost: { settle: 8 }, sky: { day: { top: "#2c2b5e", mid: "#b05d6c", hor: "#ffbb78" }, dusk: { top: "#1b1d45", mid: "#50305d", hor: "#e9784c" } }, stars: [50, 70, 85] }] };
 
   // src/levelset.js
   var CHAPTERS = levels_default.chapters;
@@ -2722,5 +2744,5 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
   } };
 })();
 </script>
-<div style="position:fixed;left:0;right:0;top:calc(env(safe-area-inset-top,0px) + 2px);z-index:99999;text-align:center;font:600 12px/1 monospace;color:#fff;opacity:.8;text-shadow:0 0 3px #000;pointer-events:none">Murmur web build 6 - a83f903 - 2026-11-03</div></body>
+<div style="position:fixed;left:0;right:0;top:calc(env(safe-area-inset-top,0px) + 2px);z-index:99999;text-align:center;font:600 12px/1 monospace;color:#fff;opacity:.8;text-shadow:0 0 3px #000;pointer-events:none">Murmur web build 7 - 938c6e0 - 2026-11-03</div></body>
 </html>
