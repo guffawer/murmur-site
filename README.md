@@ -2,6 +2,6 @@
 
 Open the page in Safari on iPhone; Share, then Add to Home Screen for full screen.
 
-**Current: build 8** (2be49ee, 2026-11-03). The same label shows at the top of the game.
+**Current: build 9** (9b2ab6a, 2026-11-03). The same label shows at the top of the game.
 
-What changed: Chapter map, stars, unlocking and saved progress
+What changed: Build 9: finger required, join celebration, steady events, per-level scenery

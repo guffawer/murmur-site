@@ -797,6 +797,7 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
     gates: [],
     feathers: [],
     pops: [],
+    cheers: [],
     falcon: { state: "idle" },
     falconTimes: [],
     falconIdx: 0,
@@ -1159,15 +1160,15 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
     n.start(t0, Math.random() * 3);
     n.stop(t0 + 0.85);
   }
-  function chime() {
+  function chime(vol) {
     if (!AC) return;
-    var t0 = AC.currentTime;
+    var t0 = AC.currentTime, pk = vol || 0.05;
     [523, 784, 1047].forEach(function(fr, i) {
       var o = AC.createOscillator();
       o.type = "sine";
       o.frequency.value = fr;
       var g = AC.createGain();
-      env(g, t0 + i * 0.12, 0.04, 0.05, 1.6);
+      env(g, t0 + i * 0.12, 0.04, pk, 1.6);
       o.connect(g);
       g.connect(master);
       o.start(t0 + i * 0.12);
@@ -1195,9 +1196,28 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
       nextChirp = t + 7 + Math.random() * 10;
     }
   }
+  function fadeOut() {
+    if (AC && master) {
+      var n = AC.currentTime;
+      master.gain.cancelScheduledValues(n);
+      master.gain.setValueAtTime(Math.max(1e-4, master.gain.value), n);
+      master.gain.exponentialRampToValueAtTime(1e-4, n + 2.2);
+    }
+  }
+  function fadeIn() {
+    if (AC && master) {
+      var n = AC.currentTime;
+      master.gain.cancelScheduledValues(n);
+      master.gain.setValueAtTime(Math.max(1e-4, master.gain.value), n);
+      master.gain.exponentialRampToValueAtTime(0.85, n + 1.2);
+    }
+  }
   function ensureAudio() {
     if (!AC) startAudio();
-    else if (AC.state === "suspended") AC.resume();
+    else {
+      if (AC.state === "suspended") AC.resume();
+      fadeIn();
+    }
   }
   function suspendAudio() {
     try {
@@ -1224,10 +1244,10 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
 
   // src/feel.js
   var GAME = {
-    speed: 1.2,
-    turn: 1.3,
-    infW: 0.1,
-    infFrac: 0.2,
+    speed: 1.3,
+    turn: 1.6,
+    infW: 0.15,
+    infFrac: 0.28,
     infFadeIn: 15,
     infFadeSpan: 40,
     infPull: 1.25,
@@ -1238,7 +1258,8 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
     regroup: 3,
     joinR: 45,
     roost: 1,
-    chase: 0
+    chase: 0,
+    needFinger: 1
   };
   var FEEL = typeof window !== "undefined" && window.__FEEL || GAME;
 
@@ -1680,7 +1701,7 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
       B.sox = NOX[bj];
       B.soy = NOY[bj];
       B.rec = Math.max((B.rec || 0) * Math.pow(0.985, f), B.st > 0.15 ? 1 : 0);
-      if (JOIN[bj] && !B.m) {
+      if (JOIN[bj] && !B.m && (!FEEL.needFinger || S.down)) {
         B.m = true;
         var cc = clusters[B.c];
         if (cc) cc.joined++;
@@ -1871,6 +1892,7 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
     S.clusters = [];
     S.feathers = [];
     S.pops = [];
+    S.cheers = [];
     var hx = Math.cos(0.25), hy = Math.sin(0.25);
     for (var i = 0; i < count; i++) {
       var a = Math.random() * TAU, r = Math.sqrt(Math.random());
@@ -1935,7 +1957,7 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
       if (u < 2.5) gt.x = enterX + (midX - enterX) * easeOut(u / 2.5);
       else if (u > gt.dur - 2.5) gt.x = midX + (exitX - midX) * easeIn((u - (gt.dur - 2.5)) / 2.5);
       else gt.x = midX;
-      var near = Math.hypot(T.x - gt.x, T.y - gt.y) < gt.size * 0.42;
+      var near = Math.hypot(T.x - gt.x, T.y - gt.y) < gt.size * 0.42 && (!FEEL.needFinger || S.down);
       var showing = gt.done && t - gt.doneT < FEEL.showHold;
       gt.forming = phase === "play" && (!gt.done && near && u > 1.2 && u < gt.dur - 2 || showing);
       gt.mix = gt.forming ? Math.min(1, gt.mix + dt / 0.6) : Math.max(0, gt.mix - dt / FEEL.unmix);
@@ -1944,17 +1966,26 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
     }
     return { activeGate, dispGate };
   }
+  function cheer(n, k) {
+    var c = { n, k: Math.min(1, k), t: 0 };
+    S.cheers.push(c);
+    return c;
+  }
   function announceJoins() {
     var s = S.s, clusters = S.clusters;
     for (var c2 = 0; c2 < clusters.length; c2++) {
       var ck = clusters[c2];
       if (ck.joined > 0 && !ck.announced) {
         ck.announced = true;
-        ck.popRef = pop(ck.x, ck.y - 18 * s, "+" + ck.joined, GLOW);
-        chirp(0.035);
-        buzz(12);
+        ck.cheer = cheer(ck.joined, 1);
+        chirp(0.05);
+        chime(0.07);
+        buzz([15, 30, 25]);
       }
-      if (ck.popRef && ck.popRef.t < 1.2) ck.popRef.text = "+" + ck.joined;
+      if (ck.cheer && ck.cheer.t < 0.9) {
+        ck.cheer.n = ck.joined;
+        ck.cheer.k = Math.min(1, 0.55 + ck.joined / 18);
+      }
     }
   }
   function updateGateProgress(dt, activeGate, inside) {
@@ -1977,8 +2008,9 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
           spawnBird(sx2, sy2, (Math.random() - 0.5) * 40 * s, true, -1, Math.cos(a2) * 3.5 * s, Math.sin(a2) * 3.5 * s, 0);
         }
         stats2.joined += bonus;
-        pop(gg.x, gg.y - gg.size * 0.42, "+" + bonus + " joined the display", GLOW);
-        chime();
+        pop(gg.x, gg.y - gg.size * 0.42, "Shape formed", GLOW);
+        cheer(bonus, 1);
+        chime(0.09);
         buzz([20, 50, 30]);
         if (FEEL.burst) {
           S.scatterT = t;
@@ -1996,7 +2028,7 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
   }
 
   // levels:levels
-  var levels_default = { chapters: [{ chapter: 1, name: "Baltic coast", sky: { day: { top: "#2c2b5e", mid: "#b05d6c", hor: "#ffbb78" }, dusk: { top: "#1b1d45", mid: "#50305d", hor: "#e9784c" } }, stars: [50, 70, 85], next: { name: "English wetlands", starsNeeded: 15 } }], levels: [{ id: "v6", chapter: 0, order: 0, test: true, name: "Prototype v6", type: "journey", length: 90, hint: "The signed-off prototype level. Used by the tests and the benchmark; not part of the game ladder.", flock: { start: 560 }, stragglers: { first: 6, gap: { min: 7, span: 3 }, size: { min: 14, span: 10 }, y: { min: 0.14, span: 0.42 }, stop: 8 }, threats: [{ kind: "peregrine", times: [12, 22, 45, 53, 66, 79], warn: 1.6, killRadius: 8, killCap: 70 }], shapes: [{ shape: "heart", at: 27, dur: 16 }, { shape: "fish", at: 57, dur: 16 }], roost: { settle: 6 }, sky: { day: { top: "#2c2b5e", mid: "#b05d6c", hor: "#ffbb78" }, dusk: { top: "#1b1d45", mid: "#50305d", hor: "#e9784c" } }, stars: [50, 70, 85] }, { id: "1.1", chapter: 1, order: 1, name: "Dune Run", type: "journey", length: 90, hint: "Drag to lead the flock along the coast to the roost. Nothing hunts here yet.", flock: { start: 560 }, threats: [], shapes: [], roost: { settle: 6 }, sky: { day: { top: "#2c2b5e", mid: "#b05d6c", hor: "#ffbb78" }, dusk: { top: "#1b1d45", mid: "#50305d", hor: "#e9784c" } }, stars: [50, 70, 85] }, { id: "1.2", chapter: 1, order: 2, name: "Amber Shore", type: "gather", length: 75, hint: "Small groups drift in from the right. Fly through them to bring them into the flock.", flock: { start: 400 }, stragglers: { first: 5, gap: { min: 5, span: 2 }, size: { min: 18, span: 10 }, y: { min: 0.14, span: 0.42 }, stop: 8 }, threats: [], shapes: [], roost: { settle: 6 }, sky: { day: { top: "#2c2b5e", mid: "#b05d6c", hor: "#ffbb78" }, dusk: { top: "#1b1d45", mid: "#50305d", hor: "#e9784c" } }, stars: [50, 70, 85] }, { id: "1.3", chapter: 1, order: 3, name: "Heart of the Bay", type: "display", length: 60, hint: "A glowing outline appears. Hold the flock inside it until the shape forms.", flock: { start: 560 }, threats: [], shapes: [{ shape: "heart", at: 12, dur: 24 }], roost: { settle: 6 }, sky: { day: { top: "#2c2b5e", mid: "#b05d6c", hor: "#ffbb78" }, dusk: { top: "#1b1d45", mid: "#50305d", hor: "#e9784c" } }, stars: [50, 70, 85] }, { id: "1.4", chapter: 1, order: 4, name: "The Peregrine", type: "gauntlet", length: 75, hint: "A peregrine falcon hunts the flock. When it lines up to stoop, tap to split the flock apart.", introduces: ["peregrine"], flock: { start: 560 }, threats: [{ kind: "peregrine", times: [16, 46], warn: 1.6, killRadius: 6, killCap: 40 }], shapes: [], roost: { settle: 6 }, sky: { day: { top: "#2c2b5e", mid: "#b05d6c", hor: "#ffbb78" }, dusk: { top: "#1b1d45", mid: "#50305d", hor: "#e9784c" } }, stars: [50, 70, 85] }, { id: "1.5", chapter: 1, order: 5, name: "Pine Ridge", type: "journey", length: 90, hint: "Gather the groups that drift in, and split the flock when the falcon stoops.", flock: { start: 520 }, stragglers: { first: 6, gap: { min: 7, span: 3 }, size: { min: 14, span: 10 }, y: { min: 0.14, span: 0.42 }, stop: 8 }, threats: [{ kind: "peregrine", times: [24, 58], warn: 1.6, killRadius: 6, killCap: 40 }], shapes: [], roost: { settle: 6 }, sky: { day: { top: "#2c2b5e", mid: "#b05d6c", hor: "#ffbb78" }, dusk: { top: "#1b1d45", mid: "#50305d", hor: "#e9784c" } }, stars: [50, 70, 85] }, { id: "1.6", chapter: 1, order: 6, name: "Sails at Dusk", type: "display", length: 60, hint: "Two shapes this time: a heart, then a sailing ship. Hold the flock inside each outline.", flock: { start: 560 }, threats: [], shapes: [{ shape: "heart", at: 8, dur: 18 }, { shape: "ship", at: 34, dur: 20 }], roost: { settle: 6 }, sky: { day: { top: "#2c2b5e", mid: "#b05d6c", hor: "#ffbb78" }, dusk: { top: "#1b1d45", mid: "#50305d", hor: "#e9784c" } }, stars: [50, 70, 85] }, { id: "1.7", chapter: 1, order: 7, name: "Lost Flocks", type: "gather", length: 75, hint: "Larger groups this time, and a falcon about. Gather them without losing the flock.", flock: { start: 440 }, stragglers: { first: 5, gap: { min: 8, span: 3 }, size: { min: 20, span: 10 }, y: { min: 0.14, span: 0.42 }, stop: 10 }, threats: [{ kind: "peregrine", times: [28, 56], warn: 1.6, killRadius: 6, killCap: 40 }], shapes: [], roost: { settle: 6 }, sky: { day: { top: "#2c2b5e", mid: "#b05d6c", hor: "#ffbb78" }, dusk: { top: "#1b1d45", mid: "#50305d", hor: "#e9784c" } }, stars: [50, 70, 85] }, { id: "1.8", chapter: 1, order: 8, name: "Falcon Cliffs", type: "gauntlet", length: 75, hint: "Three dives, and the warning is shorter. Tap as the falcon lines up.", flock: { start: 560 }, threats: [{ kind: "peregrine", times: [14, 34, 54], warn: 1.3, killRadius: 7, killCap: 40 }], shapes: [], roost: { settle: 6 }, sky: { day: { top: "#2c2b5e", mid: "#b05d6c", hor: "#ffbb78" }, dusk: { top: "#1b1d45", mid: "#50305d", hor: "#e9784c" } }, stars: [50, 70, 85] }, { id: "1.9", chapter: 1, order: 9, name: "The Long Coast", type: "journey", length: 90, hint: "Everything together: groups to gather, a heart to form, and two dives to survive.", flock: { start: 480 }, stragglers: { first: 6, gap: { min: 7, span: 3 }, size: { min: 14, span: 10 }, y: { min: 0.14, span: 0.42 }, stop: 8 }, threats: [{ kind: "peregrine", times: [20, 68], warn: 1.6, killRadius: 6, killCap: 40 }], shapes: [{ shape: "heart", at: 38, dur: 18 }], roost: { settle: 6 }, sky: { day: { top: "#2c2b5e", mid: "#b05d6c", hor: "#ffbb78" }, dusk: { top: "#1b1d45", mid: "#50305d", hor: "#e9784c" } }, stars: [50, 70, 85] }, { id: "1.10", chapter: 1, order: 10, name: "Baltic Roost", type: "grand-roost", length: 120, hint: "The chapter finale: a long flight, three dives, then a large sailing ship to form before the roost.", flock: { start: 480 }, stragglers: { first: 6, gap: { min: 8, span: 4 }, size: { min: 14, span: 10 }, y: { min: 0.14, span: 0.42 }, stop: 26 }, threats: [{ kind: "peregrine", times: [22, 52, 82], warn: 1.6, killRadius: 6, killCap: 40 }], shapes: [{ shape: "ship", at: 96, dur: 22, scale: 1.2 }], roost: { settle: 8 }, sky: { day: { top: "#2c2b5e", mid: "#b05d6c", hor: "#ffbb78" }, dusk: { top: "#1b1d45", mid: "#50305d", hor: "#e9784c" } }, stars: [50, 70, 85] }] };
+  var levels_default = { chapters: [{ chapter: 1, name: "Baltic coast", sky: { day: { top: "#2c2b5e", mid: "#b05d6c", hor: "#ffbb78" }, dusk: { top: "#1b1d45", mid: "#50305d", hor: "#e9784c" } }, stars: [75, 85, 93], next: { name: "English wetlands", starsNeeded: 15 } }], levels: [{ id: "v6", chapter: 0, order: 0, test: true, name: "Prototype v6", type: "journey", length: 90, hint: "The signed-off prototype level. Used by the tests and the benchmark; not part of the game ladder.", flock: { start: 560 }, stragglers: { first: 6, gap: { min: 7, span: 3 }, size: { min: 14, span: 10 }, y: { min: 0.14, span: 0.42 }, stop: 8 }, threats: [{ kind: "peregrine", times: [12, 22, 45, 53, 66, 79], warn: 1.6, killRadius: 8, killCap: 70 }], shapes: [{ shape: "heart", at: 27, dur: 16 }, { shape: "fish", at: 57, dur: 16 }], roost: { settle: 6 }, sky: { day: { top: "#2c2b5e", mid: "#b05d6c", hor: "#ffbb78" }, dusk: { top: "#1b1d45", mid: "#50305d", hor: "#e9784c" } }, stars: [50, 70, 85] }, { id: "1.1", chapter: 1, order: 1, name: "Dune Run", type: "journey", length: 90, hint: "Drag to lead the flock along the dunes. Fly through each small group to bring it in.", flock: { start: 380 }, threats: [], shapes: [], roost: { settle: 6 }, stragglers: { first: 3, gap: { min: 4, span: 3 }, size: { min: 10, span: 6 }, y: { min: 0.12, span: 0.55 }, stop: 10 }, sky: { day: { top: "#35508a", mid: "#e0925e", hor: "#ffd98a" }, dusk: { top: "#2a2358", mid: "#9a4a62", hor: "#f2a45a" } }, look: { sunX: 0.72, sunR: 1.35, far: [10, 2.2], mid: [34, 5.5] }, stars: [75, 85, 93] }, { id: "1.2", chapter: 1, order: 2, name: "Amber Shore", type: "gather", length: 75, hint: "Small groups drift in from the right. Fly through them to bring them into the flock.", flock: { start: 360 }, stragglers: { first: 3, gap: { min: 4, span: 3 }, size: { min: 16, span: 8 }, y: { min: 0.12, span: 0.55 }, stop: 8 }, threats: [], shapes: [], roost: { settle: 6 }, sky: { day: { top: "#3a3a70", mid: "#d9805a", hor: "#ffc77a" }, dusk: { top: "#251f4f", mid: "#7a3a55", hor: "#f08a44" } }, look: { sunX: 0.3, sea: 1, far: [8, 3.3], mid: [20, 6.1] }, stars: [75, 85, 93] }, { id: "1.3", chapter: 1, order: 3, name: "Heart of the Bay", type: "display", length: 60, hint: "A glowing outline appears. Hold the flock inside it until the shape forms.", flock: { start: 380 }, threats: [], shapes: [{ shape: "heart", at: 12, dur: 24 }], roost: { settle: 6 }, stragglers: { first: 3, gap: { min: 5, span: 3 }, size: { min: 10, span: 6 }, y: { min: 0.12, span: 0.55 }, stop: 8 }, sky: { day: { top: "#4a3d7a", mid: "#d6708a", hor: "#ffb3a0" }, dusk: { top: "#2b2058", mid: "#8a3a6a", hor: "#f4709a" } }, look: { sunX: 0.5, sunR: 1.2, sea: 1, far: [14, 1.1], mid: [16, 7.7] }, stars: [75, 85, 93] }, { id: "1.4", chapter: 1, order: 4, name: "The Peregrine", type: "gauntlet", length: 75, hint: "A peregrine falcon hunts the flock. When it lines up to stoop, tap to split the flock apart.", introduces: ["peregrine"], flock: { start: 420 }, threats: [{ kind: "peregrine", times: [16, 46], warn: 1.6, killRadius: 6, killCap: 40 }], shapes: [], roost: { settle: 6 }, stragglers: { first: 4, gap: { min: 5, span: 3 }, size: { min: 10, span: 6 }, y: { min: 0.12, span: 0.55 }, stop: 10 }, sky: { day: { top: "#2a2f4a", mid: "#5f5a78", hor: "#c9a89a" }, dusk: { top: "#15182e", mid: "#3a3552", hor: "#a8645c" } }, look: { sunX: 0.2, sunR: 0.8, mist: 1, far: [30, 8.8], mid: [40, 2.9] }, stars: [75, 85, 93] }, { id: "1.5", chapter: 1, order: 5, name: "Pine Ridge", type: "journey", length: 90, hint: "Gather the groups that drift in, and split the flock when the falcon stoops.", flock: { start: 400 }, stragglers: { first: 3, gap: { min: 5, span: 3 }, size: { min: 12, span: 8 }, y: { min: 0.12, span: 0.55 }, stop: 10 }, threats: [{ kind: "peregrine", times: [24, 58], warn: 1.6, killRadius: 6, killCap: 40 }], shapes: [], roost: { settle: 6 }, sky: { day: { top: "#1f3d4f", mid: "#4f7a78", hor: "#e8c58a" }, dusk: { top: "#101f33", mid: "#2f4f5a", hor: "#d98a58" } }, look: { sunX: 0.8, far: [24, 5.1, 1], mid: [30, 3.6, 1] }, stars: [75, 85, 93] }, { id: "1.6", chapter: 1, order: 6, name: "Sails at Dusk", type: "display", length: 60, hint: "Two shapes this time: a heart, then a sailing ship. Hold the flock inside each outline.", flock: { start: 420 }, threats: [], shapes: [{ shape: "heart", at: 8, dur: 18 }, { shape: "ship", at: 34, dur: 20 }], roost: { settle: 6 }, stragglers: { first: 3, gap: { min: 5, span: 3 }, size: { min: 10, span: 6 }, y: { min: 0.12, span: 0.55 }, stop: 8 }, sky: { day: { top: "#2b2a66", mid: "#c0507a", hor: "#ff9a5a" }, dusk: { top: "#171547", mid: "#5a2a66", hor: "#ff6a44" } }, look: { sunX: 0.55, sunR: 1.6, sea: 1, far: [6, 4.4], mid: [14, 9.2] }, stars: [75, 85, 93] }, { id: "1.7", chapter: 1, order: 7, name: "Lost Flocks", type: "gather", length: 75, hint: "Larger groups this time, and a falcon about. Gather them without losing the flock.", flock: { start: 360 }, stragglers: { first: 3, gap: { min: 5, span: 3 }, size: { min: 20, span: 10 }, y: { min: 0.12, span: 0.55 }, stop: 10 }, threats: [{ kind: "peregrine", times: [28, 56], warn: 1.6, killRadius: 6, killCap: 40 }], shapes: [], roost: { settle: 6 }, sky: { day: { top: "#3a4f6e", mid: "#8fa3b8", hor: "#e3dccb" }, dusk: { top: "#1c2a45", mid: "#4a5a7a", hor: "#c9a58a" } }, look: { sunX: 0.35, sunR: 0.9, mist: 1, far: [20, 6.6], mid: [28, 1.9] }, stars: [75, 85, 93] }, { id: "1.8", chapter: 1, order: 8, name: "Falcon Cliffs", type: "gauntlet", length: 75, hint: "Three dives, and the warning is shorter. Tap as the falcon lines up.", flock: { start: 420 }, threats: [{ kind: "peregrine", times: [14, 21, 36, 52, 59], warn: 1.3, killRadius: 7, killCap: 40 }], shapes: [], roost: { settle: 6 }, stragglers: { first: 3, gap: { min: 4, span: 3 }, size: { min: 10, span: 6 }, y: { min: 0.12, span: 0.55 }, stop: 10 }, sky: { day: { top: "#3a1f3f", mid: "#a8454f", hor: "#ffa064" }, dusk: { top: "#1c1030", mid: "#62253f", hor: "#e8584a" } }, look: { sunX: 0.78, far: [34, 7.1], mid: [52, 8.3] }, stars: [75, 85, 93] }, { id: "1.9", chapter: 1, order: 9, name: "The Long Coast", type: "journey", length: 90, hint: "Everything together: groups to gather, a heart to form, and two dives to survive.", flock: { start: 400 }, stragglers: { first: 3, gap: { min: 5, span: 3 }, size: { min: 12, span: 8 }, y: { min: 0.12, span: 0.55 }, stop: 10 }, threats: [{ kind: "peregrine", times: [14, 28, 68], warn: 1.6, killRadius: 6, killCap: 40 }], shapes: [{ shape: "heart", at: 38, dur: 18 }], roost: { settle: 6 }, sky: { day: { top: "#1f4a5e", mid: "#4fa3a0", hor: "#ffe0a0" }, dusk: { top: "#102a46", mid: "#3a6a78", hor: "#f0b060" } }, look: { sunX: 0.6, sea: 1, far: [16, 2.7, 1], mid: [22, 4.8] }, stars: [75, 85, 93] }, { id: "1.10", chapter: 1, order: 10, name: "Baltic Roost", type: "grand-roost", length: 120, hint: "The chapter finale: a long flight, three dives, then a large sailing ship to form before the roost.", flock: { start: 380 }, stragglers: { first: 3, gap: { min: 5, span: 3 }, size: { min: 14, span: 10 }, y: { min: 0.12, span: 0.55 }, stop: 26 }, threats: [{ kind: "peregrine", times: [22, 30, 52, 82, 90], warn: 1.6, killRadius: 6, killCap: 40 }], shapes: [{ shape: "ship", at: 96, dur: 22, scale: 1.2 }], roost: { settle: 8 }, sky: { day: { top: "#2a1f5e", mid: "#7a3a7a", hor: "#ffa07a" }, dusk: { top: "#0f0c33", mid: "#3a1f5a", hor: "#e8603c" } }, look: { sunX: 0.5, sunR: 1.1, moon: 1, far: [22, 3.1], mid: [30, 6.4, 1] }, stars: [75, 85, 93] }] };
 
   // src/levelset.js
   var CHAPTERS = levels_default.chapters;
@@ -2175,7 +2207,12 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
   function drawBirds() {
     var s = S.s, birds = S.birds, phase = S.phase, t = S.t;
     var home = FEEL.roost && S.perch && (phase === "roost" || phase === "end") ? phase === "end" ? 1 : Math.max(0, Math.min(1, (S.roostT - 1.5) / 2)) : 0;
-    var base = 2.5 * s;
+    var base = 2.5 * s, ch = 0, jit = 0, t2 = S.t;
+    for (var ci = 0; ci < S.cheers.length; ci++) {
+      var cq = S.cheers[ci], cv2 = Math.max(0, 1 - cq.t / 1.5) * (0.5 + 0.5 * cq.k);
+      if (cv2 > ch) ch = cv2;
+    }
+    jit = ch * 2.2 * s;
     for (var i2 = 0; i2 < birds.length; i2++) {
       var b = birds[i2];
       if (!b.alive) continue;
@@ -2188,23 +2225,31 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
     var alphas = [0.5, 0.75, 0.95], widths = [1.2, 1.5, 1.8];
     ctx.lineCap = "round";
     for (var kb = 0; kb < 3; kb++) {
-      ctx.strokeStyle = home > 0 ? rgba(mix(INK, GLOW, home * 0.9), alphas[kb] + (1 - alphas[kb]) * home * 0.5) : rgba(INK, alphas[kb]);
-      ctx.lineWidth = widths[kb] * s * (1 + 0.4 * home);
+      var lit = Math.max(home, ch);
+      ctx.strokeStyle = lit > 0 ? rgba(mix(INK, GLOW, lit * 0.95), alphas[kb] + (1 - alphas[kb]) * lit * 0.5) : rgba(INK, alphas[kb]);
+      ctx.lineWidth = widths[kb] * s * (1 + 0.4 * lit);
       ctx.beginPath();
+      if (ch > 0) {
+        ctx.shadowColor = rgba(GLOW, 1);
+        ctx.shadowBlur = 10 * s * ch;
+      }
       for (var i3 = 0; i3 < birds.length; i3++) {
         var bb = birds[i3];
         if (!bb.alive || bb.k !== kb) continue;
         var h2 = Math.hypot(bb.vx, bb.vy) || 1, ux = -bb.vy / h2 * bb.L, uy = bb.vx / h2 * bb.L;
-        ctx.moveTo(bb.x - ux, bb.y - uy);
-        ctx.lineTo(bb.x + ux, bb.y + uy);
+        var jx = jit ? Math.sin(t2 * 53 + i3 * 1.7) * jit : 0, jy = jit ? Math.cos(t2 * 47 + i3 * 2.3) * jit : 0;
+        ctx.moveTo(bb.x - ux + jx, bb.y - uy + jy);
+        ctx.lineTo(bb.x + ux + jx, bb.y + uy + jy);
       }
       ctx.stroke();
+      ctx.shadowBlur = 0;
     }
   }
   function render() {
     var phase = S.phase, t = S.t, LEVEL = S.LEVEL, W = S.W, H = S.H, s = S.s, gates = S.gates, birds = S.birds;
     var falcon = S.falcon, roostT = S.roostT, feathers = S.feathers, pops = S.pops;
-    var pr = phase === "menu" ? 0.18 : phase === "end" ? 1 : Math.min(1, t / (LEVEL + 4));
+    var settle = S.level && S.level.roost ? S.level.roost.settle : 4, pr = phase === "menu" ? 0.18 : phase === "end" ? 1 : Math.min(1, t / (LEVEL + settle));
+    var LK = S.level && S.level.look || {};
     var DAY = S.sky.day, DUSK = S.sky.dusk;
     var top = mix(DAY.top, DUSK.top, pr), mid = mix(DAY.mid, DUSK.mid, pr), hor = mix(DAY.hor, DUSK.hor, pr);
     var horizonY = H * 0.72;
@@ -2222,7 +2267,7 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
         ctx.fillRect(sx.x * W, sx.y * H, sx.r, sx.r);
       }
     }
-    var sunY = horizonY - H * 0.1 * (1 - pr) + 6 * s, sunX = W * 0.7, sr = 34 * s;
+    var sunY = horizonY - H * 0.1 * (1 - pr) + 6 * s, sunX = W * (LK.sunX || 0.7), sr = 34 * s * (LK.sunR || 1);
     var sg = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, sr * 5);
     sg.addColorStop(0, rgba(mix(hor, GLOW, 0.6), 0.55));
     sg.addColorStop(1, rgba(hor, 0));
@@ -2232,8 +2277,40 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
     ctx.beginPath();
     ctx.arc(sunX, sunY, sr, 0, TAU);
     ctx.fill();
-    drawLayer(rgba(mix(INK, hor, 0.5)), H * 0.72, 18, 10, 1.3, false);
-    drawLayer(rgba(mix(INK, mid, 0.32)), H * 0.785, 26, 22, 4.1, false);
+    if (LK.moon) {
+      var mx = W * 0.2, my = H * 0.17 + (1 - pr) * H * 0.1;
+      ctx.fillStyle = rgba(GLOW, 0.14 * pr + 0.04);
+      ctx.beginPath();
+      ctx.arc(mx, my, 40 * s, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = rgba(mix(GLOW, [255, 255, 255], 0.5), 0.5 + 0.4 * pr);
+      ctx.beginPath();
+      ctx.arc(mx, my, 17 * s, 0, TAU);
+      ctx.fill();
+    }
+    var F = LK.far || [18, 1.3], M = LK.mid || [26, 4.1];
+    drawLayer(rgba(mix(INK, hor, 0.5)), H * 0.72, F[0], 10, F[1], !!F[2]);
+    if (LK.sea) {
+      var sy0 = H * 0.725, sg2 = ctx.createLinearGradient(0, sy0, 0, H * 0.82);
+      sg2.addColorStop(0, rgba(mix(hor, GLOW, 0.25), 0.95));
+      sg2.addColorStop(1, rgba(mix(INK, mid, 0.45), 1));
+      ctx.fillStyle = sg2;
+      ctx.fillRect(0, sy0, W, H * 0.82 - sy0);
+      ctx.fillStyle = rgba(GLOW, 0.5);
+      for (var wv = 0; wv < 26; wv++) {
+        var wy = sy0 + 3 * s + wv / 26 * (H * 0.82 - sy0 - 6 * s), spread = 18 + (wy - sy0) * 0.9, wx = sunX + Math.sin(t * 1.3 + wv * 2.1) * spread * 0.5;
+        ctx.fillRect(wx - (10 + wv * 0.8) * s * 0.5, wy, (10 + wv * 0.8) * s, 1.6 * s * (0.4 + 0.6 * Math.abs(Math.sin(t * 2 + wv))));
+      }
+    }
+    drawLayer(rgba(mix(INK, mid, 0.32)), H * 0.785, M[0], 22, M[1], !!M[2]);
+    if (LK.mist) {
+      var mg = ctx.createLinearGradient(0, H * 0.3, 0, H * 0.74);
+      mg.addColorStop(0, rgba(hor, 0));
+      mg.addColorStop(0.7, rgba(mix(hor, GLOW, 0.2), 0.3));
+      mg.addColorStop(1, rgba(hor, 0.05));
+      ctx.fillStyle = mg;
+      ctx.fillRect(0, H * 0.3, W, H * 0.44);
+    }
     if (FEEL.roost && S.perch && (phase === "roost" || phase === "end")) {
       var gl = phase === "end" ? 1 : Math.max(0, Math.min(1, (roostT - 1.8) / 2.2)), pu = 0.85 + 0.15 * Math.sin(t * 2);
       if (gl > 0) {
@@ -2337,7 +2414,43 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
       ctx.fillStyle = rgba(po.col, Math.max(0, 1 - po.t / 1.6));
       ctx.fillText(po.text, po.x, po.y - po.t * 26 * s);
     }
+    drawCheers();
     if (phase === "play" || phase === "roost") drawHUD();
+  }
+  function drawCheers() {
+    var s = S.s, cheers = S.cheers, W = S.W, H = S.H;
+    for (var i = 0; i < cheers.length; i++) {
+      var c = cheers[i], u = c.t / 1.6, fade = Math.max(0, 1 - u), pop2 = u < 0.12 ? u / 0.12 * 1.25 : 1.25 - 0.25 * Math.min(1, (u - 0.12) / 0.15);
+      var cx = Math.max(100 * s, Math.min(W - 100 * s, S.cen.x)), cy = Math.max(S.SAFE_T + 150 * s, S.cen.y);
+      ctx.fillStyle = rgba(GLOW, 0.1 * fade * c.k);
+      ctx.fillRect(0, 0, W, H);
+      for (var r = 0; r < 2; r++) {
+        var ru = Math.max(0, Math.min(1, u * 1.3 - r * 0.18));
+        if (ru <= 0) continue;
+        ctx.strokeStyle = rgba(GLOW, (1 - ru) * 0.8);
+        ctx.lineWidth = (5 - 3 * ru) * s;
+        ctx.beginPath();
+        ctx.arc(cx, cy, (40 + ru * 230 * (0.7 + 0.5 * c.k)) * s, 0, TAU);
+        ctx.stroke();
+      }
+      var size = Math.round((34 + 26 * c.k) * s * pop2);
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.font = "700 " + size + "px Outfit, Arial, sans-serif";
+      var ty = cy - (70 + 40 * u) * s;
+      ctx.lineJoin = "round";
+      ctx.lineWidth = 7 * s;
+      ctx.strokeStyle = rgba(INK, 0.85 * Math.min(1, fade * 2.2));
+      ctx.strokeText("+" + c.n, cx, ty);
+      ctx.fillStyle = rgba(GLOW, Math.min(1, fade * 2.2));
+      ctx.fillText("+" + c.n, cx, ty);
+      ctx.font = "600 " + Math.round(13 * s) + "px Outfit, Arial, sans-serif";
+      ctx.strokeStyle = rgba(INK, 0.8 * Math.min(1, fade * 2));
+      ctx.lineWidth = 4 * s;
+      ctx.strokeText("joined the flock", cx, ty + size * 0.62);
+      ctx.fillText("joined the flock", cx, ty + size * 0.62);
+      ctx.textBaseline = "alphabetic";
+    }
   }
   function drawHUD() {
     var SAFE_T = S.SAFE_T, SAFE_B = S.SAFE_B, s = S.s, W = S.W, H = S.H, t = S.t, LEVEL = S.LEVEL, gates = S.gates, phase = S.phase;
@@ -2371,6 +2484,17 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
       ctx.arc(gx, by, 3.5 * s, 0, TAU);
       ctx.fill();
     }
+    ctx.fillStyle = rgba(GLOW, 0.9);
+    ctx.beginPath();
+    ctx.moveTo(bx + bw, by - 7 * s);
+    ctx.lineTo(bx + bw + 5 * s, by + 2 * s);
+    ctx.lineTo(bx + bw - 5 * s, by + 2 * s);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillRect(bx + bw - 1 * s, by + 2 * s, 2 * s, 4 * s);
+    ctx.beginPath();
+    ctx.arc(bx + bw * pr, by, 4.5 * s, 0, TAU);
+    ctx.fill();
     ctx.textAlign = "right";
     ctx.fillStyle = rgba(GLOW, 0.75);
     ctx.font = "400 " + Math.round(11 * s) + "px Outfit, Arial, sans-serif";
@@ -2757,6 +2881,11 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
       fe.r += 0.05 * f;
       if (fe.t > 2.2) feathers.splice(p, 1);
     }
+    var ch = S.cheers;
+    for (var cc = ch.length - 1; cc >= 0; cc--) {
+      ch[cc].t += dt;
+      if (ch[cc].t > 1.8) ch.splice(cc, 1);
+    }
     for (var pp = pops.length - 1; pp >= 0; pp--) {
       pops[pp].t += dt;
       if (pops[pp].t > 1.6) pops.splice(pp, 1);
@@ -2853,6 +2982,8 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
     document.getElementById("introHint").textContent = l.hint;
     document.getElementById("introGoal").textContent = goalText(l);
     mapEl.hidden = true;
+    startEl2.hidden = true;
+    endEl2.hidden = true;
     introEl.hidden = false;
   }
   function showStart() {
@@ -2875,6 +3006,7 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
   function finish(home) {
     S.phase = "end";
     S.down = false;
+    fadeOut();
     var n = home ? S.members : 0, b = best();
     if (n > b) {
       b = n;
@@ -2974,5 +3106,5 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
   } };
 })();
 </script>
-<div style="position:fixed;left:0;right:0;top:calc(env(safe-area-inset-top,0px) + 2px);z-index:99999;text-align:center;font:600 12px/1 monospace;color:#fff;opacity:.8;text-shadow:0 0 3px #000;pointer-events:none">Murmur web build 8 - 2be49ee - 2026-11-03</div></body>
+<div style="position:fixed;left:0;right:0;top:calc(env(safe-area-inset-top,0px) + 2px);z-index:99999;text-align:center;font:600 12px/1 monospace;color:#fff;opacity:.8;text-shadow:0 0 3px #000;pointer-events:none">Murmur web build 9 - 9b2ab6a - 2026-11-03</div></body>
 </html>
