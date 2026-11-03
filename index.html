@@ -883,6 +883,22 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
     }
     return buf;
   }
+  function makeBrown(ac, secs) {
+    var len = ac.sampleRate * secs, buf = ac.createBuffer(1, len, ac.sampleRate), d = buf.getChannelData(0), last2 = 0, mx = 1e-4;
+    for (var i = 0; i < len; i++) {
+      last2 = (last2 + 0.02 * (Math.random() * 2 - 1)) / 1.02;
+      d[i] = last2;
+      if (Math.abs(last2) > mx) mx = Math.abs(last2);
+    }
+    var fade = Math.floor(ac.sampleRate * 0.5);
+    for (var j = 0; j < fade; j++) {
+      var k = j / fade;
+      d[j] = d[j] * k + d[len - fade + j] * (1 - k);
+    }
+    for (var m = 0; m < len; m++) d[m] = d[m] / mx * 0.8;
+    return buf;
+  }
+  var windHi = null;
   function startAudio() {
     try {
       var A = window.AudioContext || window.webkitAudioContext;
@@ -894,29 +910,43 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
       master.connect(AC.destination);
       pinkBuf = makePink(AC, 6);
       var b = AC.createBufferSource();
-      b.buffer = pinkBuf;
+      b.buffer = makeBrown(AC, 10);
       b.loop = true;
       breezeF = AC.createBiquadFilter();
       breezeF.type = "lowpass";
-      breezeF.frequency.value = 260;
-      breezeF.Q.value = 0.2;
+      breezeF.frequency.value = 240;
+      breezeF.Q.value = 0.1;
       var hp = AC.createBiquadFilter();
       hp.type = "highpass";
-      hp.frequency.value = 70;
+      hp.frequency.value = 40;
       breezeG = AC.createGain();
-      breezeG.gain.value = 0.2;
+      breezeG.gain.value = 0.55;
       b.connect(hp);
       hp.connect(breezeF);
       breezeF.connect(breezeG);
       breezeG.connect(master);
       b.start();
+      var hi = AC.createBufferSource();
+      hi.buffer = pinkBuf;
+      hi.loop = true;
+      hi.playbackRate.value = 0.7;
+      var hif = AC.createBiquadFilter();
+      hif.type = "bandpass";
+      hif.frequency.value = 520;
+      hif.Q.value = 0.6;
+      windHi = AC.createGain();
+      windHi.gain.value = 0.01;
+      hi.connect(hif);
+      hif.connect(windHi);
+      windHi.connect(master);
+      hi.start(0, 1.1);
       var r = AC.createBufferSource();
       r.buffer = pinkBuf;
       r.loop = true;
       r.playbackRate.value = 1.35;
       rushF = AC.createBiquadFilter();
       rushF.type = "bandpass";
-      rushF.frequency.value = 900;
+      rushF.frequency.value = 500;
       rushF.Q.value = 0.55;
       rushG = AC.createGain();
       rushG.gain.value = 0;
@@ -1072,14 +1102,17 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
     var phase = S.phase, avgSpeed = S.avgSpeed, members = S.members, t = S.t;
     var now = AC.currentTime;
     if (now > nextGust) {
-      breezeG.gain.setTargetAtTime(0.16 + Math.random() * 0.08, now, 3.5);
-      breezeF.frequency.setTargetAtTime(220 + Math.random() * 110, now, 4);
-      nextGust = now + 7 + Math.random() * 6;
+      breezeG.gain.setTargetAtTime(0.45 + Math.random() * 0.2, now, 5);
+      breezeF.frequency.setTargetAtTime(200 + Math.random() * 120, now, 5);
+      if (windHi) {
+        windHi.gain.setTargetAtTime(6e-3 + Math.random() * 0.016, now, 4);
+      }
+      nextGust = now + 8 + Math.random() * 7;
     }
     var live = phase === "play" || phase === "roost" ? 1 : 0.4;
-    var rush = (0.01 + avgSpeed * 0.035 + Math.min(1, turn) * 0.08) * Math.min(1, members / 150) * live;
+    var rush = (4e-3 + avgSpeed * 0.01 + Math.min(1, turn) * 0.02) * Math.min(1, members / 150) * live;
     rushG.gain.setTargetAtTime(rush, now, 0.25);
-    rushF.frequency.setTargetAtTime(700 + avgSpeed * 500 + Math.min(1, turn) * 500, now, 0.3);
+    rushF.frequency.setTargetAtTime(450 + avgSpeed * 150 + Math.min(1, turn) * 150, now, 0.5);
     if (t > nextChirp) {
       chirp(6e-3 + Math.random() * 8e-3);
       nextChirp = t + 7 + Math.random() * 10;
@@ -1114,17 +1147,18 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
 
   // src/feel.js
   var GAME = {
-    speed: 1.5,
-    turn: 1.5,
-    infW: 0.1,
+    speed: 1.1,
+    turn: 1.2,
+    infW: 0.2,
     infFrac: 0.2,
-    infFadeIn: 15,
-    infFadeSpan: 40,
-    infPull: 1.25,
+    infFadeIn: 8,
+    infFadeSpan: 24,
+    infPull: 1.6,
     showHold: 0.1,
     unmix: 0.25,
     burst: 3.2,
-    pull: 6
+    pull: 3,
+    joinR: 45
   };
   var FEEL = typeof window !== "undefined" && window.__FEEL || GAME;
 
@@ -1329,7 +1363,7 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
     for (var bi = 0; bi < birds.length; bi++) {
       var b = birds[bi];
       if (!b.alive) continue;
-      var nc = 0;
+      var nc = 0, nearMember = 0;
       var gx0 = b.ci % gcols, gy0 = b.ci / gcols | 0;
       for (var oy = -1; oy <= 1; oy++) {
         var gy = gy0 + oy;
@@ -1341,6 +1375,7 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
           while (j !== -1) {
             if (j !== bi) {
               var o = birds[j], ex = o.x - b.x, ey = o.y - b.y, ez = o.z - b.z, d2 = ex * ex + ey * ey + ez * ez;
+              if (FEEL.joinR && !b.m && o.m && d2 < FEEL.joinR * FEEL.joinR * s * s) nearMember = 1;
               var slot = -1;
               if (nc < TOPO) {
                 slot = nc;
@@ -1362,6 +1397,7 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
       }
       var ax = 0, ay = 0, az = 0;
       var st = b.st * 0.9, sox = b.sox, soy = b.soy, join = 0;
+      if (nearMember) join = 1;
       if (nc) {
         var avx = 0, avy = 0, avz = 0, apx = 0, apy = 0, apz = 0, eux = 0, euy = 0, euz = 0;
         for (var q = 0; q < nc; q++) {
@@ -1902,8 +1938,8 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
     drawLayer(rgba(mix(INK, mid, 0.32)), H * 0.785, 26, 22, 4.1, false);
     for (var g = 0; g < gates.length; g++) {
       var gt = gates[g];
-      if (!gt.vis) continue;
-      var glowA = gt.done ? Math.max(0, 1 - (t - gt.doneT) / 2.5) : 0.45 + 0.25 * Math.sin(t * 3);
+      if (!gt.vis || gt.done && t - gt.doneT > 2) continue;
+      var glowA = gt.done ? Math.max(0, 1 - (t - gt.doneT) / 2) : 0.45 + 0.25 * Math.sin(t * 3);
       ctx.save();
       ctx.translate(gt.x, gt.y);
       ctx.scale(gt.size, gt.size);
@@ -1914,6 +1950,18 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
       ctx.lineDashOffset = -t * 0.02;
       ctx.strokeStyle = rgba(GLOW, glowA);
       ctx.stroke(gt.shape.path);
+      if (gt.done) {
+        var ag = t - gt.doneT, fa = Math.max(0, 1 - ag / 2), pulse = 1 + 0.6 * Math.exp(-ag * 5);
+        ctx.setLineDash([]);
+        ctx.shadowColor = rgba(GLOW, 1);
+        ctx.shadowBlur = 34 * s * fa * pulse;
+        ctx.lineWidth = 4 * s * pulse / gt.size;
+        ctx.strokeStyle = rgba(GLOW, 0.95 * fa);
+        ctx.stroke(gt.shape.path);
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = rgba(GLOW, 0.22 * fa);
+        ctx.fill(gt.shape.path);
+      }
       ctx.restore();
       if (!gt.done && gt.progress > 0) {
         ctx.strokeStyle = rgba(GLOW, 0.95);
@@ -2547,5 +2595,5 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
   } };
 })();
 </script>
-<div style="position:fixed;left:0;right:0;top:calc(env(safe-area-inset-top,0px) + 2px);z-index:99999;text-align:center;font:600 12px/1 monospace;color:#fff;opacity:.8;text-shadow:0 0 3px #000;pointer-events:none">Murmur web build 2 - d72eaeb - 2026-11-03</div></body>
+<div style="position:fixed;left:0;right:0;top:calc(env(safe-area-inset-top,0px) + 2px);z-index:99999;text-align:center;font:600 12px/1 monospace;color:#fff;opacity:.8;text-shadow:0 0 3px #000;pointer-events:none">Murmur web build 3 - fa1e8fa - 2026-11-03</div></body>
 </html>
