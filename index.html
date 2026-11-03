@@ -740,6 +740,8 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
     // flow
     phase: "menu",
     t: 0,
+    ter: 0,
+    perch: null,
     roostT: 0,
     LEVEL: 90,
     START_BIRDS: 560,
@@ -1160,9 +1162,18 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
     pull: 0.9,
     regroup: 3,
     joinR: 45,
-    roost: 1
+    roost: 1,
+    chase: 0
   };
   var FEEL = typeof window !== "undefined" && window.__FEEL || GAME;
+
+  // src/terrain.js
+  function terrain(x, base, amp, seed2, trees) {
+    var s = S.s;
+    var h = Math.sin(x * 4e-3 + seed2) * amp + Math.sin(x * 0.011 + seed2 * 2.1) * amp * 0.5 + Math.sin(x * 0.027 + seed2 * 0.7) * amp * 0.18;
+    if (trees) h += Math.pow(Math.max(0, Math.sin(x * 0.031 + 1.7)), 14) * 30 * s + Math.pow(Math.max(0, Math.sin(x * 0.053 + 0.4)), 18) * 22 * s;
+    return base - h;
+  }
 
   // src/flock.js
   function spawnBird(x, y, z, member, cid, vx, vy, vz) {
@@ -1204,6 +1215,25 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
     }
     swoosh();
     buzz(18);
+  }
+  function pickPerches() {
+    var s = S.s, W = S.W, H = S.H, off = (S.ter + 0.75) * 44 * s, pts = [], x;
+    S.perchOff = off;
+    for (x = 0.1 * W; x <= 0.9 * W; x += 4) {
+      var y = terrain(x + off, H * 0.875, 30 * s, 7.7, true);
+      if (y <= terrain(x - 4 + off, H * 0.875, 30 * s, 7.7, true) && y <= terrain(x + 4 + off, H * 0.875, 30 * s, 7.7, true)) pts.push({ x, y });
+    }
+    pts.sort(function(a, b) {
+      return a.y - b.y;
+    });
+    var pick = [];
+    for (var i = 0; i < pts.length && pick.length < 8; i++) {
+      var ok = true;
+      for (var j = 0; j < pick.length; j++) if (Math.abs(pick[j].x - pts[i].x) < 45 * s) ok = false;
+      if (ok) pick.push(pts[i]);
+    }
+    if (!pick.length) pick.push({ x: W * 0.5, y: H * 0.8 });
+    S.perch = pick;
   }
   var CS = 24;
   var gcols = 0;
@@ -1347,12 +1377,14 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
       labelIn = 5;
     }
     var TOPO = 7, HOP = window.__P && window.__P.hop || 0.92;
+    var chase = FEEL.chase && S.phase === "play" && S.down ? Math.max(0, Math.min(1, (Math.hypot(T.x - cen.x, T.y - cen.y) - 70 * s) / (220 * s))) : 0;
     var cruise = 3 * s * FEEL.speed, vmin = 2 * s * FEEL.speed, vmax = 6.2 * s * FEEL.speed;
     var P = window.__P || {};
+    var RGK = FEEL.regroup * (1 - 0.8 * FEEL.chase * chase);
     var ALIGN = P.align || 0.07, COH = (P.coh || 4e-3) * FEEL.pull, SEP = (P.sep || 0.55) * s, rs = (P.rs || 11) * s, EDGE = P.edge || 1.5, ROOST = P.roost || 16e-5, ZK = P.zk || 35e-4;
     var INF_W = P.inf || FEEL.infW;
-    var RG = (P.rg || 8) * s * Math.sqrt(Math.max(members, 30)), KG = (P.kg || 25e-4) * FEEL.regroup, GCAP = (P.gcap || 0.2) * s * FEEL.regroup;
-    var LONG = (P.long || 0.08) * s * FEEL.regroup, NS = P.ns || 4, LR = (P.lr || 70) * s, BOOST = P.boost || 0.5;
+    var RG = (P.rg || 8) * s * Math.sqrt(Math.max(members, 30)), KG = (P.kg || 25e-4) * RGK, GCAP = (P.gcap || 0.2) * s * RGK;
+    var LONG = (P.long || 0.08) * s * RGK, NS = P.ns || 4, LR = (P.lr || 70) * s, BOOST = P.boost || 0.5;
     var diving = falcon.state === "dive", warn = falcon.state === "warn";
     var detR = 0.2 * Math.min(W, H), detR2 = detR * detR, killR = 8 * s, killCap = 70;
     var shp = activeGate || dispGate && dispGate.mix > 0.05 ? (activeGate || dispGate).shape : null;
@@ -1491,7 +1523,7 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
         var infNow = (b.seed + (t * (P.rot || 0.5) | 0) * 7919) % 100 < (P.pct || 20);
         var minor = LAB[bi] >= 0 && LAB[bi] !== mainId && !shp;
         if (minor) {
-          var jx = mainCx - b.x, jy = mainCy - b.y, jd = Math.hypot(jx, jy) || 1, KJ = (P.kj || 0.18) * s * FEEL.regroup * holdK;
+          var jx = mainCx - b.x, jy = mainCy - b.y, jd = Math.hypot(jx, jy) || 1, KJ = (P.kj || 0.18) * s * RGK * holdK;
           ax += jx / jd * KJ;
           ay += jy / jd * KJ;
         }
@@ -1499,8 +1531,8 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
           var tx = Px - b.x, ty = Py - b.y, td = Math.hypot(tx, ty) || 1;
           var fade = Math.max(0, Math.min(1, (td - FEEL.infFadeIn * s) / (FEEL.infFadeSpan * s)));
           if (fade > 0) {
-            ax += (tx / td * cruise * FEEL.infPull - b.vx) * INF_W * fade;
-            ay += (ty / td * cruise * FEEL.infPull - b.vy) * INF_W * fade;
+            ax += (tx / td * cruise * (1 + 0.5 * FEEL.chase * chase) * FEEL.infPull - b.vx) * INF_W * fade;
+            ay += (ty / td * cruise * (1 + 0.5 * FEEL.chase * chase) * FEEL.infPull - b.vy) * INF_W * fade;
             az += (-b.z * 0.02 - b.vz) * INF_W * fade * 0.5;
           }
         }
@@ -1547,7 +1579,7 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
         ay = ay * (1 - mixG) + day * mixG;
         az = az * (1 - mixG) + daz * mixG;
       }
-      var amax = ((0.3 + 0.45 * st) * FEEL.turn * (1 - mixG) + 0.8 * (b.m ? mixG : 0) + 0.5 * FLASH) * s, am = Math.sqrt(ax * ax + ay * ay + az * az);
+      var amax = ((0.3 + 0.45 * st) * FEEL.turn * (1 + 0.6 * FEEL.chase * chase) * (1 - mixG) + 0.8 * (b.m ? mixG : 0) + 0.5 * FLASH) * s, am = Math.sqrt(ax * ax + ay * ay + az * az);
       if (am > amax) {
         ax = ax / am * amax;
         ay = ay / am * amax;
@@ -1565,7 +1597,7 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
       JOIN[bi] = join;
     }
     var spdSum = 0, spdN = 0, inside = 0;
-    var roosting = FEEL.roost && S.phase === "roost", rk = roosting ? Math.min(1, S.roostT / 1.2) : 0;
+    var roosting = FEEL.roost && (S.phase === "roost" || S.phase === "end" && !!S.perch), rk = roosting ? Math.min(1, S.roostT / 1.2) : 0;
     for (var bj = 0; bj < birds.length; bj++) {
       var B = birds[bj];
       if (!B.alive) continue;
@@ -1581,7 +1613,9 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
         stats2.joined++;
       }
       if (roosting && B.m) {
-        var rpx = W * 0.5 + (B.seed % 997 / 997 - 0.5) * W * 0.62, rpy = H * 0.68 + (B.seed >> 4) % 89 / 89 * H * 0.075;
+        if (!S.perch) pickPerches();
+        var pk = S.perch[B.seed % 997 % S.perch.length], rpx = pk.x + ((B.seed >> 3) % 101 / 101 - 0.5) * 46 * s;
+        var rpy = terrain(rpx + S.perchOff, H * 0.875, 30 * s, 7.7, true) - (8 - (B.seed >> 5) % 53 / 53 * 30) * s;
         var rdx = Math.max(-vmax, Math.min(vmax, (rpx - B.x) * 0.035)), rdy = Math.max(-vmax, Math.min(vmax, (rpy - B.y) * 0.035));
         B.vx += (rdx - B.vx) * 0.07 * rk * f;
         B.vy += (rdy - B.vy) * 0.07 * rk * f;
@@ -1597,7 +1631,7 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
       B.vy += AY[bj] * f;
       B.vz += AZ[bj] * f;
       var sp = Math.sqrt(B.vx * B.vx + B.vy * B.vy + B.vz * B.vz) || 1e-4;
-      var want = cruise * (1 + 0.3 * B.st + BOOST * BST[bj] + 0.6 * FLASH);
+      var want = cruise * (1 + 0.3 * B.st + BOOST * BST[bj] + 0.6 * FLASH + FEEL.chase * chase);
       var nsp = Math.max(vmin, Math.min(vmax * (1 + 0.3 * FLASH), sp + (want - sp) * 0.05 * f));
       if (mixG > 0 && B.m) nsp = nsp * (1 - mixG) + Math.min(vmax, sp) * mixG;
       B.vx = B.vx / sp * nsp;
@@ -1775,6 +1809,8 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
     S.nextCluster = 6;
     S.roostT = 0;
     S.t = 0;
+    S.ter = 0;
+    S.perch = null;
   }
   function updateStragglers(dt) {
     var s = S.s, W = S.W, H = S.H, t = S.t, phase = S.phase, LEVEL = S.LEVEL, clusters = S.clusters, birds = S.birds;
@@ -1877,15 +1913,9 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
   var stars = [];
   for (sti = 0; sti < 70; sti++) stars.push({ x: Math.random(), y: Math.random() * 0.45, r: Math.random() * 1.1 + 0.3, tw: Math.random() * TAU });
   var sti;
-  function terrain(x, base, amp, seed2, trees) {
-    var s = S.s;
-    var h = Math.sin(x * 4e-3 + seed2) * amp + Math.sin(x * 0.011 + seed2 * 2.1) * amp * 0.5 + Math.sin(x * 0.027 + seed2 * 0.7) * amp * 0.18;
-    if (trees) h += Math.pow(Math.max(0, Math.sin(x * 0.031 + 1.7)), 14) * 30 * s + Math.pow(Math.max(0, Math.sin(x * 0.053 + 0.4)), 18) * 22 * s;
-    return base - h;
-  }
   function drawLayer(col, base, amp, speed, seed2, trees) {
     var phase = S.phase, t = S.t, s = S.s, W = S.W, H = S.H;
-    var off = (phase === "menu" || phase === "end" ? t * 0.3 : t) * speed * s;
+    var off = (phase === "menu" || phase === "end" && !FEEL.roost ? t * 0.3 : S.ter) * speed * s;
     ctx.fillStyle = col;
     ctx.beginPath();
     ctx.moveTo(0, H);
@@ -1920,6 +1950,35 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
     ctx.fill();
     ctx.restore();
   }
+  function drawBirds() {
+    var s = S.s, birds = S.birds, phase = S.phase, t = S.t;
+    var home = FEEL.roost && S.perch && (phase === "roost" || phase === "end") ? phase === "end" ? 1 : Math.max(0, Math.min(1, (S.roostT - 1.5) / 2)) : 0;
+    var base = 2.5 * s;
+    for (var i2 = 0; i2 < birds.length; i2++) {
+      var b = birds[i2];
+      if (!b.alive) continue;
+      var vxy = Math.hypot(b.vx, b.vy), vm = Math.sqrt(vxy * vxy + b.vz * b.vz) || 1, vis = vxy / vm;
+      var ds = Math.max(0.6, Math.min(1.45, 1 + b.z / (220 * s)));
+      b.L = base * ds * (0.25 + 0.75 * vis);
+      var a = 0.42 + 0.55 * (ds - 0.6) / 0.85;
+      b.k = a < 0.6 ? 0 : a < 0.8 ? 1 : 2;
+    }
+    var alphas = [0.5, 0.75, 0.95], widths = [1.2, 1.5, 1.8];
+    ctx.lineCap = "round";
+    for (var kb = 0; kb < 3; kb++) {
+      ctx.strokeStyle = home > 0 ? rgba(mix(INK, GLOW, home * 0.9), alphas[kb] + (1 - alphas[kb]) * home * 0.5) : rgba(INK, alphas[kb]);
+      ctx.lineWidth = widths[kb] * s * (1 + 0.4 * home);
+      ctx.beginPath();
+      for (var i3 = 0; i3 < birds.length; i3++) {
+        var bb = birds[i3];
+        if (!bb.alive || bb.k !== kb) continue;
+        var h2 = Math.hypot(bb.vx, bb.vy) || 1, ux = -bb.vy / h2 * bb.L, uy = bb.vx / h2 * bb.L;
+        ctx.moveTo(bb.x - ux, bb.y - uy);
+        ctx.lineTo(bb.x + ux, bb.y + uy);
+      }
+      ctx.stroke();
+    }
+  }
   function render() {
     var phase = S.phase, t = S.t, LEVEL = S.LEVEL, W = S.W, H = S.H, s = S.s, gates = S.gates, birds = S.birds;
     var falcon = S.falcon, roostT = S.roostT, feathers = S.feathers, pops = S.pops;
@@ -1952,6 +2011,20 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
     ctx.fill();
     drawLayer(rgba(mix(INK, hor, 0.5)), H * 0.72, 18, 10, 1.3, false);
     drawLayer(rgba(mix(INK, mid, 0.32)), H * 0.785, 26, 22, 4.1, false);
+    if (FEEL.roost && S.perch && (phase === "roost" || phase === "end")) {
+      var gl = phase === "end" ? 1 : Math.max(0, Math.min(1, (roostT - 1.8) / 2.2)), pu = 0.85 + 0.15 * Math.sin(t * 2);
+      if (gl > 0) {
+        ctx.fillStyle = rgba(GLOW, 0.07 * gl);
+        ctx.fillRect(0, H * 0.45, W, H * 0.55);
+        for (var pi = 0; pi < S.perch.length; pi++) {
+          var pk = S.perch[pi], rg = ctx.createRadialGradient(pk.x, pk.y, 0, pk.x, pk.y, 90 * s);
+          rg.addColorStop(0, rgba(GLOW, 0.42 * gl * pu));
+          rg.addColorStop(1, rgba(GLOW, 0));
+          ctx.fillStyle = rg;
+          ctx.fillRect(pk.x - 90 * s, pk.y - 90 * s, 180 * s, 180 * s);
+        }
+      }
+    }
     for (var g = 0; g < gates.length; g++) {
       var gt = gates[g];
       if (!gt.vis || gt.done && t - gt.doneT > 2) continue;
@@ -1988,31 +2061,8 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
         ctx.stroke();
       }
     }
-    var base = 2.5 * s;
-    for (var i2 = 0; i2 < birds.length; i2++) {
-      var b = birds[i2];
-      if (!b.alive) continue;
-      var vxy = Math.hypot(b.vx, b.vy), vm = Math.sqrt(vxy * vxy + b.vz * b.vz) || 1, vis = vxy / vm;
-      var ds = Math.max(0.6, Math.min(1.45, 1 + b.z / (220 * s)));
-      b.L = base * ds * (0.25 + 0.75 * vis);
-      var a = 0.42 + 0.55 * (ds - 0.6) / 0.85;
-      b.k = a < 0.6 ? 0 : a < 0.8 ? 1 : 2;
-    }
-    var alphas = [0.5, 0.75, 0.95], widths = [1.2, 1.5, 1.8];
-    ctx.lineCap = "round";
-    for (var kb = 0; kb < 3; kb++) {
-      ctx.strokeStyle = rgba(INK, alphas[kb]);
-      ctx.lineWidth = widths[kb] * s;
-      ctx.beginPath();
-      for (var i3 = 0; i3 < birds.length; i3++) {
-        var bb = birds[i3];
-        if (!bb.alive || bb.k !== kb) continue;
-        var h2 = Math.hypot(bb.vx, bb.vy) || 1, ux = -bb.vy / h2 * bb.L, uy = bb.vx / h2 * bb.L;
-        ctx.moveTo(bb.x - ux, bb.y - uy);
-        ctx.lineTo(bb.x + ux, bb.y + uy);
-      }
-      ctx.stroke();
-    }
+    var settled = FEEL.roost && S.perch && (phase === "roost" || phase === "end");
+    if (!settled) drawBirds();
     if (falcon.state === "leave") drawFalcon(falcon.x, falcon.y, falcon.ang, 0.82 + 0.18 * Math.sin(falcon.flap * 11), 0.15, 1.25 * s);
     if (falcon.state === "warn" || falcon.state === "dive") {
       if (falcon.state === "warn") {
@@ -2047,6 +2097,7 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
       }
       ctx.stroke();
     }
+    if (settled) drawBirds();
     for (var p = 0; p < feathers.length; p++) {
       var fe = feathers[p];
       ctx.save();
@@ -2505,6 +2556,7 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
   function update(dt) {
     var f = dt * 60;
     S.t += dt;
+    S.ter += S.phase === "roost" ? dt * Math.max(0, 1 - S.roostT / 1.5) : S.phase === "end" && FEEL.roost ? 0 : dt;
     steerTarget(f);
     measureFlock(dt);
     updateStragglers(dt);
@@ -2611,5 +2663,5 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
   } };
 })();
 </script>
-<div style="position:fixed;left:0;right:0;top:calc(env(safe-area-inset-top,0px) + 2px);z-index:99999;text-align:center;font:600 12px/1 monospace;color:#fff;opacity:.8;text-shadow:0 0 3px #000;pointer-events:none">Murmur web build 4 - d4f5d16 - 2026-11-03</div></body>
+<div style="position:fixed;left:0;right:0;top:calc(env(safe-area-inset-top,0px) + 2px);z-index:99999;text-align:center;font:600 12px/1 monospace;color:#fff;opacity:.8;text-shadow:0 0 3px #000;pointer-events:none">Murmur web build 5 - e99a27a - 2026-11-03</div></body>
 </html>

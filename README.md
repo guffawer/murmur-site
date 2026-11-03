@@ -2,6 +2,6 @@
 
 Open the page in Safari on iPhone; Share, then Add to Home Screen for full screen.
 
-**Current: build 4** (d4f5d16, 2026-11-03). The same label shows at the top of the game.
+**Current: build 5** (e99a27a, 2026-11-03). The same label shows at the top of the game.
 
-What changed: one teardrop while leading (no blobs), v6 spacing, birds settle on the trees at the end
+What changed: birds settle in the tree crowns at the end with a warm glow; ground eases to a stop
