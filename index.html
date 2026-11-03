@@ -49,6 +49,8 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
 .stats dt { color: var(--muted); }
 .stats dd { margin: 0; font-variant-numeric: tabular-nums; font-weight: 600; }
 .ghost { font-weight: 600; font-size: 0.82rem; color: var(--text); background: transparent; border: 1px solid rgba(246,234,216,0.32); padding: 10px 12px; }
+.pick { display: flex; gap: 10px; align-items: center; justify-content: center; font-size: 0.82rem; color: var(--muted); }
+.pick select { font: 600 0.9rem var(--font-ui); color: var(--text); background: rgba(20,15,28,0.6); border: 1px solid rgba(246,234,216,0.32); border-radius: 6px; padding: 9px 10px; max-width: 230px; }
 .tools { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
 .card.wide { max-width: 380px; }
 .sub { font-family: var(--font-display); font-style: italic; font-weight: 600; font-size: 1.9rem; line-height: 1; color: var(--glow); margin: 0; }
@@ -77,11 +79,12 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
       <li><b>Gather</b><span>Fly through stragglers to grow the flock</span></li>
     </ul>
     <button id="go" type="button">Begin flight</button>
+    <label class="pick">Level <select id="levelPick"></select></label>
     <div class="tools">
       <button id="benchGo" type="button" class="ghost">Benchmark (60 s)</button>
       <button id="readoutBtn" type="button" class="ghost" aria-pressed="false">Frame readout: off</button>
     </div>
-    <p class="note">Prototype v6, one level, about 90 seconds. Sound on. Haptics work in Android browsers; on iPhone they arrive with the native build.</p>
+    <p class="note">Chapter 1 is being built level by level: pick one above. Sound on. Haptics work in Android browsers; on iPhone they arrive with the native build.</p>
   </div>
 </div>
 
@@ -121,10 +124,10 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
       __defProp(target, name, { get: all[name], enumerable: true });
   };
 
-  // node_modules/@capacitor/core/dist/index.js
+  // ../murmur/node_modules/@capacitor/core/dist/index.js
   var ExceptionCode, CapacitorException, getPlatformId, createCapacitor, initCapacitorGlobal, Capacitor, registerPlugin, WebPlugin, encode, decode, CapacitorCookiesPluginWeb, CapacitorCookies, readBlobAsBase64, normalizeHttpHeaders, buildUrlParams, buildRequestInit, CapacitorHttpPluginWeb, CapacitorHttp, SystemBarsStyle, SystemBarType, SystemBarsPluginWeb, SystemBars;
   var init_dist = __esm({
-    "node_modules/@capacitor/core/dist/index.js"() {
+    "../murmur/node_modules/@capacitor/core/dist/index.js"() {
       (function(ExceptionCode2) {
         ExceptionCode2["Unimplemented"] = "UNIMPLEMENTED";
         ExceptionCode2["Unavailable"] = "UNAVAILABLE";
@@ -632,14 +635,14 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
     }
   });
 
-  // node_modules/@capacitor/app/dist/esm/web.js
+  // ../murmur/node_modules/@capacitor/app/dist/esm/web.js
   var web_exports = {};
   __export(web_exports, {
     AppWeb: () => AppWeb
   });
   var AppWeb;
   var init_web = __esm({
-    "node_modules/@capacitor/app/dist/esm/web.js"() {
+    "../murmur/node_modules/@capacitor/app/dist/esm/web.js"() {
       init_dist();
       AppWeb = class extends WebPlugin {
         constructor() {
@@ -684,14 +687,14 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
     }
   });
 
-  // node_modules/@capacitor/splash-screen/dist/esm/web.js
+  // ../murmur/node_modules/@capacitor/splash-screen/dist/esm/web.js
   var web_exports2 = {};
   __export(web_exports2, {
     SplashScreenWeb: () => SplashScreenWeb
   });
   var SplashScreenWeb;
   var init_web2 = __esm({
-    "node_modules/@capacitor/splash-screen/dist/esm/web.js"() {
+    "../murmur/node_modules/@capacitor/splash-screen/dist/esm/web.js"() {
       init_dist();
       SplashScreenWeb = class extends WebPlugin {
         async show(_options) {
@@ -745,6 +748,11 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
     roostT: 0,
     LEVEL: 90,
     START_BIRDS: 560,
+    // the level being played (set by levels.setLevel from a level file), its sky colours and falcon settings, and the birds on offer for the stars
+    level: null,
+    sky: null,
+    threat: null,
+    offered: 0,
     // world
     birds: [],
     clusters: [],
@@ -812,6 +820,9 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
     return Math.pow(Math.min(1, x), 3);
   }
 
+  // src/shapenames.js
+  var SHAPE_NAMES = ["heart", "fish"];
+
   // src/shapes.js
   function makeShape(build) {
     var p = new Path2D();
@@ -852,6 +863,10 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
     p.lineTo(0.39, 0);
     p.lineTo(0.47, 0.21);
     p.closePath();
+  });
+  var SHAPES = { heart: HEART, fish: FISH };
+  SHAPE_NAMES.forEach(function(n) {
+    if (!SHAPES[n]) throw new Error("shape missing: " + n);
   });
 
   // src/audio.js
@@ -1226,14 +1241,14 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
     pts.sort(function(a, b) {
       return a.y - b.y;
     });
-    var pick = [];
-    for (var i = 0; i < pts.length && pick.length < 8; i++) {
+    var pick2 = [];
+    for (var i = 0; i < pts.length && pick2.length < 8; i++) {
       var ok = true;
-      for (var j = 0; j < pick.length; j++) if (Math.abs(pick[j].x - pts[i].x) < 45 * s) ok = false;
-      if (ok) pick.push(pts[i]);
+      for (var j = 0; j < pick2.length; j++) if (Math.abs(pick2[j].x - pts[i].x) < 45 * s) ok = false;
+      if (ok) pick2.push(pts[i]);
     }
-    if (!pick.length) pick.push({ x: W * 0.5, y: H * 0.8 });
-    S.perch = pick;
+    if (!pick2.length) pick2.push({ x: W * 0.5, y: H * 0.8 });
+    S.perch = pick2;
   }
   var CS = 24;
   var gcols = 0;
@@ -1386,7 +1401,7 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
     var RG = (P.rg || 8) * s * Math.sqrt(Math.max(members, 30)), KG = (P.kg || 25e-4) * RGK, GCAP = (P.gcap || 0.2) * s * RGK;
     var LONG = (P.long || 0.08) * s * RGK, NS = P.ns || 4, LR = (P.lr || 70) * s, BOOST = P.boost || 0.5;
     var diving = falcon.state === "dive", warn = falcon.state === "warn";
-    var detR = 0.2 * Math.min(W, H), detR2 = detR * detR, killR = 8 * s, killCap = 70;
+    var detR = 0.2 * Math.min(W, H), detR2 = detR * detR, killR = S.threat.killRadius * s, killCap = S.threat.killCap;
     var shp = activeGate || dispGate && dispGate.mix > 0.05 ? (activeGate || dispGate).shape : null;
     var Px = activeGate ? activeGate.x : T.x, Py = activeGate ? activeGate.y : T.y;
     var seedScatter = false;
@@ -1720,8 +1735,6 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
   function rgba(c, a) {
     return "rgba(" + (c[0] | 0) + "," + (c[1] | 0) + "," + (c[2] | 0) + "," + (a == null ? 1 : a) + ")";
   }
-  var DAY = { top: hex("#2c2b5e"), mid: hex("#b05d6c"), hor: hex("#ffbb78") };
-  var DUSK = { top: hex("#1b1d45"), mid: hex("#50305d"), hor: hex("#e9784c") };
   var INK = hex("#140f1c");
   var GLOW = hex("#ffd7a0");
   var DANGER = hex("#ff7a66");
@@ -1761,7 +1774,7 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
       S.falcon.dx = ddx / dn;
       S.falcon.dy = ddy / dn;
       S.falcon.ang = S.falcon.side > 0 ? 0.08 * Math.sin(S.falcon.wt * 2) : Math.PI + 0.08 * Math.sin(S.falcon.wt * 2);
-      if (S.falcon.wt > 1.6) {
+      if (S.falcon.wt > S.threat.warn) {
         S.falcon.state = "dive";
         S.falcon.spd = Math.max(W, H) * 1.35;
         S.falcon.ang = Math.atan2(S.falcon.dy, S.falcon.dx);
@@ -1781,6 +1794,17 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
   }
 
   // src/levels.js
+  var SHAPE_BONUS = 40;
+  function palette(p) {
+    return { top: hex(p.top), mid: hex(p.mid), hor: hex(p.hor) };
+  }
+  function setLevel(lv) {
+    S.level = lv;
+    S.LEVEL = lv.length;
+    S.START_BIRDS = lv.flock.start;
+    S.sky = { day: palette(lv.sky.day), dusk: palette(lv.sky.dusk) };
+    S.threat = lv.threats.length ? lv.threats[0] : { warn: 1.6, killRadius: 8, killCap: 70 };
+  }
   function reset(count) {
     var W = S.W, H = S.H, s = S.s;
     S.birds = [];
@@ -1795,31 +1819,33 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
       var z = (Math.random() - 0.5) * 80 * s;
       spawnBird(x, y, z, true, -1, (hx * 3 + (Math.random() - 0.5) * 0.8) * s, (hy * 3 + (Math.random() - 0.5) * 0.8) * s, (Math.random() - 0.5) * 0.8 * s);
     }
-    S.gates = [
-      { id: 1, shape: HEART, t0: 27, dur: 16, progress: 0, done: false, doneT: -1, x: 0, y: 0, size: 0, vis: false, forming: false, mix: 0, slots: 0 },
-      { id: 2, shape: FISH, t0: 57, dur: 16, progress: 0, done: false, doneT: -1, x: 0, y: 0, size: 0, vis: false, forming: false, mix: 0, slots: 0 }
-    ];
+    var lv = S.level;
+    S.gates = lv.shapes.map(function(g, i2) {
+      return { id: i2 + 1, shape: SHAPES[g.shape], t0: g.at, dur: g.dur, scale: g.scale || 1, progress: 0, done: false, doneT: -1, x: 0, y: 0, size: 0, vis: false, forming: false, mix: 0, slots: 0 };
+    });
     S.falcon = { state: "idle" };
-    S.falconTimes = [12, 22, 45, 53, 66, 79];
+    S.falconTimes = lv.threats.length ? lv.threats[0].times : [];
     S.falconIdx = 0;
     S.stats = { start: count, joined: 0, lost: 0, gates: 0 };
+    S.offered = count + SHAPE_BONUS * S.gates.length;
     S.T.x = W * 0.5;
     S.T.y = H * 0.36;
     S.scatterT = -99;
-    S.nextCluster = 6;
+    S.nextCluster = lv.stragglers ? lv.stragglers.first : Infinity;
     S.roostT = 0;
     S.t = 0;
     S.ter = 0;
     S.perch = null;
   }
   function updateStragglers(dt) {
-    var s = S.s, W = S.W, H = S.H, t = S.t, phase = S.phase, LEVEL = S.LEVEL, clusters = S.clusters, birds = S.birds;
-    if (phase === "play" && t >= S.nextCluster && t < LEVEL - 8) {
-      var cid = clusters.length, cy0 = H * (0.14 + Math.random() * 0.42);
+    var s = S.s, W = S.W, H = S.H, t = S.t, phase = S.phase, LEVEL = S.LEVEL, clusters = S.clusters, birds = S.birds, ST = S.level.stragglers;
+    if (ST && phase === "play" && t >= S.nextCluster && t < LEVEL - ST.stop) {
+      var cid = clusters.length, cy0 = H * (ST.y.min + Math.random() * ST.y.span);
       clusters.push({ x: W + 50 * s, y: cy0, by: cy0, ph: Math.random() * TAU, alive: true, joined: 0 });
-      var n = 14 + (Math.random() * 10 | 0);
+      var n = ST.size.min + (Math.random() * ST.size.span | 0);
       for (var k = 0; k < n; k++) spawnBird(W + 50 * s + Math.random() * 30 * s, cy0 + (Math.random() - 0.5) * 22 * s, (Math.random() - 0.5) * 20 * s, false, cid, -2.2 * s, 0, 0);
-      S.nextCluster = t + 7 + Math.random() * 3;
+      S.nextCluster = t + ST.gap.min + Math.random() * ST.gap.span;
+      S.offered += n;
     }
     for (var c = 0; c < clusters.length; c++) {
       var cl = clusters[c];
@@ -1837,7 +1863,7 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
     var activeGate = null, dispGate = null;
     for (var g = 0; g < gates.length; g++) {
       var gt = gates[g], u = t - gt.t0;
-      gt.size = Math.min(W * 0.78, H * 0.46);
+      gt.size = Math.min(W * 0.78, H * 0.46) * gt.scale;
       gt.y = H * 0.37;
       gt.vis = (phase === "play" || phase === "roost") && u >= 0 && u <= gt.dur;
       if (!gt.vis) {
@@ -1884,7 +1910,7 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
         gg.done = true;
         gg.doneT = t;
         stats2.gates++;
-        var bonus = 40;
+        var bonus = SHAPE_BONUS;
         for (var q2 = 0; q2 < bonus; q2++) {
           var sd = q2 % 3, sx2 = sd === 0 ? -20 : sd === 1 ? W + 20 : Math.random() * W, sy2 = sd < 2 ? H * (0.1 + Math.random() * 0.4) : -20;
           var a2 = Math.atan2(gg.y - sy2, gg.x - sx2);
@@ -1908,6 +1934,21 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
       }
     }
   }
+
+  // levels:levels
+  var levels_default = { chapters: [{ chapter: 1, name: "Baltic coast", sky: { day: { top: "#2c2b5e", mid: "#b05d6c", hor: "#ffbb78" }, dusk: { top: "#1b1d45", mid: "#50305d", hor: "#e9784c" } }, stars: [50, 70, 85], next: { name: "English wetlands", starsNeeded: 15 } }], levels: [{ id: "v6", chapter: 0, order: 0, test: true, name: "Prototype v6", type: "journey", length: 90, hint: "The signed-off prototype level. Used by the tests and the benchmark; not part of the game ladder.", flock: { start: 560 }, stragglers: { first: 6, gap: { min: 7, span: 3 }, size: { min: 14, span: 10 }, y: { min: 0.14, span: 0.42 }, stop: 8 }, threats: [{ kind: "peregrine", times: [12, 22, 45, 53, 66, 79], warn: 1.6, killRadius: 8, killCap: 70 }], shapes: [{ shape: "heart", at: 27, dur: 16 }, { shape: "fish", at: 57, dur: 16 }], roost: { settle: 6 }, sky: { day: { top: "#2c2b5e", mid: "#b05d6c", hor: "#ffbb78" }, dusk: { top: "#1b1d45", mid: "#50305d", hor: "#e9784c" } }, stars: [50, 70, 85] }, { id: "1.1", chapter: 1, order: 1, name: "Dune Run", type: "journey", length: 90, hint: "Drag to lead the flock along the coast to the roost. Nothing hunts here yet.", flock: { start: 560 }, threats: [], shapes: [], roost: { settle: 6 }, sky: { day: { top: "#2c2b5e", mid: "#b05d6c", hor: "#ffbb78" }, dusk: { top: "#1b1d45", mid: "#50305d", hor: "#e9784c" } }, stars: [50, 70, 85] }, { id: "1.2", chapter: 1, order: 2, name: "Amber Shore", type: "gather", length: 75, hint: "Small groups drift in from the right. Fly through them to bring them into the flock.", flock: { start: 400 }, stragglers: { first: 5, gap: { min: 5, span: 2 }, size: { min: 18, span: 10 }, y: { min: 0.14, span: 0.42 }, stop: 8 }, threats: [], shapes: [], roost: { settle: 6 }, sky: { day: { top: "#2c2b5e", mid: "#b05d6c", hor: "#ffbb78" }, dusk: { top: "#1b1d45", mid: "#50305d", hor: "#e9784c" } }, stars: [50, 70, 85] }] };
+
+  // src/levelset.js
+  var CHAPTERS = levels_default.chapters;
+  var LEVELS = levels_default.levels;
+  var LADDER = LEVELS.filter(function(l) {
+    return !l.test;
+  });
+  function getLevel(id) {
+    for (var i = 0; i < LEVELS.length; i++) if (LEVELS[i].id === id) return LEVELS[i];
+    return null;
+  }
+  var V6 = getLevel("v6");
 
   // src/render.js
   var stars = [];
@@ -1983,6 +2024,7 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
     var phase = S.phase, t = S.t, LEVEL = S.LEVEL, W = S.W, H = S.H, s = S.s, gates = S.gates, birds = S.birds;
     var falcon = S.falcon, roostT = S.roostT, feathers = S.feathers, pops = S.pops;
     var pr = phase === "menu" ? 0.18 : phase === "end" ? 1 : Math.min(1, t / (LEVEL + 4));
+    var DAY = S.sky.day, DUSK = S.sky.dusk;
     var top = mix(DAY.top, DUSK.top, pr), mid = mix(DAY.mid, DUSK.mid, pr), hor = mix(DAY.hor, DUSK.hor, pr);
     var horizonY = H * 0.72;
     var grd = ctx.createLinearGradient(0, 0, 0, horizonY);
@@ -2180,13 +2222,13 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
   // src/native.js
   init_dist();
 
-  // node_modules/@capacitor/app/dist/esm/index.js
+  // ../murmur/node_modules/@capacitor/app/dist/esm/index.js
   init_dist();
   var App = registerPlugin("App", {
     web: () => Promise.resolve().then(() => (init_web(), web_exports)).then((m) => new m.AppWeb())
   });
 
-  // node_modules/@capacitor/splash-screen/dist/esm/index.js
+  // ../murmur/node_modules/@capacitor/splash-screen/dist/esm/index.js
   init_dist();
   var SplashScreen = registerPlugin("SplashScreen", {
     web: () => Promise.resolve().then(() => (init_web2(), web_exports2)).then((m) => new m.SplashScreenWeb())
@@ -2324,6 +2366,7 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
   function beginRun() {
     orig = Math.random;
     Math.random = mulberry32(SEED);
+    setLevel(V6);
     reset(BIRDS);
     S.members = BIRDS;
     S.nextCluster = Infinity;
@@ -2594,7 +2637,7 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
       }
     } else if (S.phase === "roost") {
       S.roostT += dt;
-      if (S.roostT > (FEEL.roost ? 6 : 4.5)) finish(true);
+      if (S.roostT > (FEEL.roost ? S.level.roost.settle : 4.5)) finish(true);
     }
   }
   var startEl2 = document.getElementById("start");
@@ -2612,8 +2655,23 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
     } catch (e) {
     }
   }
+  function wantedLevel() {
+    if (window.__LEVEL) return getLevel(window.__LEVEL);
+    var m = /[?&]level=([\w.-]+)/.exec(window.location && window.location.search || "");
+    return m ? getLevel(m[1]) : null;
+  }
+  var current = wantedLevel() || LADDER[0] || V6;
+  var pick = document.getElementById("levelPick");
+  pick.innerHTML = LEVELS.map(function(l) {
+    return '<option value="' + l.id + '">' + (l.test ? "Test: " : l.id + "  ") + l.name + "</option>";
+  }).join("");
+  pick.value = current.id;
+  pick.addEventListener("change", function() {
+    current = getLevel(pick.value) || current;
+  });
   function begin() {
     ensureAudio();
+    setLevel(current);
     reset(S.START_BIRDS);
     S.usedScatter = false;
     S.phase = "play";
@@ -2639,6 +2697,7 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
   }
   document.getElementById("go").addEventListener("click", begin);
   document.getElementById("again").addEventListener("click", begin);
+  setLevel(current);
   reset(480);
   var last = performance.now();
   function frame2(now) {
@@ -2652,7 +2711,7 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
     requestAnimationFrame(frame2);
   }
   requestAnimationFrame(frame2);
-  window.__murmur = { birds: function() {
+  window.__murmur = { state: S, birds: function() {
     return S.birds;
   }, cen: S.cen, T: S.T, gates: function() {
     return S.gates;
@@ -2663,5 +2722,5 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
   } };
 })();
 </script>
-<div style="position:fixed;left:0;right:0;top:calc(env(safe-area-inset-top,0px) + 2px);z-index:99999;text-align:center;font:600 12px/1 monospace;color:#fff;opacity:.8;text-shadow:0 0 3px #000;pointer-events:none">Murmur web build 5 - e99a27a - 2026-11-03</div></body>
+<div style="position:fixed;left:0;right:0;top:calc(env(safe-area-inset-top,0px) + 2px);z-index:99999;text-align:center;font:600 12px/1 monospace;color:#fff;opacity:.8;text-shadow:0 0 3px #000;pointer-events:none">Murmur web build 6 - a83f903 - 2026-11-03</div></body>
 </html>

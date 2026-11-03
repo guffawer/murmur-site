@@ -2,6 +2,6 @@
 
 Open the page in Safari on iPhone; Share, then Add to Home Screen for full screen.
 
-**Current: build 5** (e99a27a, 2026-11-03). The same label shows at the top of the game.
+**Current: build 6** (a83f903, 2026-11-03). The same label shows at the top of the game.
 
-What changed: birds settle in the tree crowns at the end with a warm glow; ground eases to a stop
+What changed: Level format and runner, level picker, levels 1.1 and 1.2
